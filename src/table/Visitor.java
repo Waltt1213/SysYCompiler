@@ -29,10 +29,9 @@ import java.util.HashMap;
 
 public class Visitor {
     private final CompUnit root;
-
     private final ArrayList<SymbolTable> symbolTables;    //  符号表集
     private final ArrayDeque<SymbolTable> tableStack;     // 符号表栈
-    private final HashMap<AstNode, Symbol> nodeSymbolNap; // node-symbol对应表
+    private final HashMap<Token, Symbol> nodeSymbolNap; // node-symbol对应表
     private final ArrayDeque<Symbol> symStack;            // 符号栈
     private final HashMap<String, Symbol> funcNameTable;
     private final ArrayDeque<BlockType> blockStack;
@@ -65,13 +64,15 @@ public class Visitor {
         symbolTables.add(curTable);
         curFunc = null;
         visit(root, null);
+        tableStack.clear();
+        symStack.clear();
     }
 
     public ArrayList<SymbolTable> getSymbolTables() {
         return symbolTables;
     }
 
-    public HashMap<AstNode, Symbol> getNodeSymbolNap() {
+    public HashMap<Token, Symbol> getNodeSymbolNap() {
         return nodeSymbolNap;
     }
 
@@ -125,7 +126,7 @@ public class Visitor {
             symStack.push(func);
             curTable.addSymItem(funcName, func);
             funcNameTable.put(funcName, func);
-            nodeSymbolNap.put(fd, func);
+            nodeSymbolNap.put(fd.getIdent(), func);
         } catch (Error e) {
             errors.add(new Error("b", fd.getFuncType().getType().getLineno()));
         }
@@ -139,7 +140,9 @@ public class Visitor {
 
     public void visitBlock(FuncFParams fps) {
         curDepth++;
-        curTable = new SymbolTable(curTable, curDepth);
+        SymbolTable st = new SymbolTable(curTable, curDepth);
+        curTable.addChildren(st);   // 新表设为当前表的孩子
+        curTable = st;
         symbolTables.add(curTable); // 将符号表加入符号表集
         tableStack.push(curTable); // 入栈
         if (fps != null) {
@@ -182,7 +185,7 @@ public class Visitor {
         Variable var = new Variable(varName, st, curDepth, constDef.getIdent().getLineno(), civ);
         curTable.addSymItem(varName, var);
         symStack.push(var);
-        nodeSymbolNap.put(constDef, var);
+        nodeSymbolNap.put(constDef.getIdent(), var);
     }
 
     public void visitVarDecl(VarDecl vd) {
@@ -209,7 +212,7 @@ public class Visitor {
         Variable var = new Variable(varName, st, curDepth, varDef.getIdent().getLineno(), iv);
         curTable.addSymItem(varName, var);
         symStack.push(var);
-        nodeSymbolNap.put(varDef, var);
+        nodeSymbolNap.put(varDef.getIdent(), var);
     }
 
     public void visitFuncFParams(FuncFParams fps) throws Error {
@@ -226,7 +229,7 @@ public class Visitor {
             FuncVar symbol = new FuncVar(funcVarName, st, curDepth, fp.getIdent().getLineno(), fps.getFuncName());
             curTable.addSymItem(funcVarName, symbol);
             symStack.push(symbol);
-            nodeSymbolNap.put(fp, symbol);
+            nodeSymbolNap.put(fp.getIdent(), symbol);
         }
     }
 
@@ -296,12 +299,13 @@ public class Visitor {
 
     public void checkError(AstNode astNode) {
         if (astNode instanceof LVal) {
-            String name = ((LVal) astNode).getIdent().getContent();
+            String name = ((LVal) astNode).getIdentName();
             if (!findSymInStack(name, "Var")) {
                 errors.add(new Error("c", ((LVal) astNode).getIdent().getLineno()));
             }
+            nodeSymbolNap.put(((LVal) astNode).getIdent(), getSymInStack(name, "Var"));
         } else if (astNode instanceof UnaryExp && ((UnaryExp)astNode).isIdent()) {
-            String name = ((UnaryExp) astNode).getIdent().getContent();
+            String name = ((UnaryExp) astNode).getIdentName();
             if (!findSymInStack(name, "Func")) {
                 errors.add(new Error("c", ((UnaryExp) astNode).getIdent().getLineno()));
             }
@@ -314,6 +318,7 @@ public class Visitor {
                     checkFuncParams(func.getFuncFParams(), ue.getFuncRParams());
                 }
             }
+            nodeSymbolNap.put(((UnaryExp) astNode).getIdent(), getSymInStack(name, "Func"));
         } else if (astNode instanceof Stmt && ((Stmt) astNode).getType() == Stmt.StmtType.RETURN) {
             if (curFunc.getType().toString().equals("VoidFunc") && !astNode.getAstChild().isEmpty()) {
                 errors.add(new Error("f", ((Stmt) astNode).getLineno()));
