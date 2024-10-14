@@ -86,66 +86,17 @@ public class Visitor {
     public void visit(AstNode astNode, FuncFParams fps) {
         if (astNode == null) { return; }
         if (astNode instanceof Block) {
-            curDepth++;
-            curTable = new SymbolTable(curTable, curDepth);
-            symbolTables.add(curTable); // 将符号表加入符号表集
-            tableStack.push(curTable); // 入栈
-            if (fps != null) {
-                try {
-                    visitFuncFParams(fps);  // 函数形参与函数块内符号属于同一层级
-                } catch (Error e) { errors.add(e); }
-            }
+            visitBlock(fps);
         }
         if (astNode instanceof MainFuncDef) {
-            SymType st = new SymType("Int", false, false, true);
-            curFunc = new Function("main", st, curDepth, ((MainFuncDef) astNode).getLineno(), 0);
-            if (!((MainFuncDef) astNode).getBlock().hasRet()) {
-                errors.add(new Error("g", ((MainFuncDef) astNode).getBlock().getLineno()));
-            }
-            blockStack.push(BlockType.FuncBlock);
+            visitMainFuncDef(((MainFuncDef) astNode));
         }
         if (astNode instanceof ConstDecl) {
-            ConstDecl cd = (ConstDecl) astNode;
-            String varType = getType(cd.getType()); // Int or Char
-            for (AstNode astChild : cd.getAstChild()) {
-                try {
-                    visitConstDef(varType, (ConstDef) astChild);
-                } catch (Error e) {
-                    errors.add(new Error("b", ((ConstDef) astChild).getIdent().getLineno()));
-                }
-            }
+            visitConstDecl((ConstDecl) astNode);
         } else if (astNode instanceof VarDecl) {
-            VarDecl vd = (VarDecl) astNode;
-            String vaType = getType(vd.getType());
-            for (AstNode node: vd.getAstChild()) {
-                try {
-                    visitVarDef(vaType, (VarDef) node);
-                } catch (Error e) {
-                    errors.add(new Error("b", ((VarDef) node).getIdent().getLineno()));
-                }
-            }
+            visitVarDecl((VarDecl) astNode);
         } else if (astNode instanceof FuncDef) {
-            FuncDef fd = (FuncDef) astNode;
-            String funcType = getType(fd.getFuncType().getType());
-            SymType ft = new SymType(funcType, false, false, true);
-            String funcName = fd.getIdent().getContent();
-            try {
-                Function func = new Function(funcName, ft, curDepth, fd.getFuncType().getType().getLineno(), fd.getArgc());
-                if (fd.hasFParams()) { func.setFuncFParams(fd.getFuncFParams()); }
-                curFunc = func;
-                symStack.push(func);
-                curTable.addSymItem(funcName, func);
-                funcNameTable.put(funcName, func);
-                nodeSymbolNap.put(fd, func);
-            } catch (Error e) {
-                errors.add(new Error("b", fd.getFuncType().getType().getLineno()));
-            }
-            // 形参需要加入符号表，但属于下一层级
-            blockStack.push(BlockType.FuncBlock);
-            visit(fd.getBlock(), fd.getFuncFParams());  // 构建函数内符号表
-            if (!ft.toString().equals("VoidFunc") && !fd.getBlock().hasRet()) {
-                errors.add(new Error("g", fd.getBlock().getLineno()));
-            }
+            visitFuncDef((FuncDef) astNode);
             return;
         }
         checkError(astNode);
@@ -163,62 +114,59 @@ public class Visitor {
         }
     }
 
-    public void checkError(AstNode astNode) {
-        if (astNode instanceof LVal) {
-            String name = ((LVal) astNode).getIdent().getContent();
-            if (!findSymInStack(name, "Var")) {
-                errors.add(new Error("c", ((LVal) astNode).getIdent().getLineno()));
-            }
-        } else if (astNode instanceof UnaryExp && ((UnaryExp)astNode).isIdent()) {
-            String name = ((UnaryExp) astNode).getIdent().getContent();
-            if (!findSymInStack(name, "Func")) {
-                errors.add(new Error("c", ((UnaryExp) astNode).getIdent().getLineno()));
-            }
-            if (((UnaryExp) astNode).hasFuncRParams() && funcNameTable.containsKey(name)) {
-                UnaryExp ue = (UnaryExp) astNode;
-                Function func = (Function) funcNameTable.get(name);
-                if (func != null && ue.getArgc() != func.getArgc()) {
-                    errors.add(new Error("d", ue.getLineno()));
-                } else if (func != null) {
-                    checkFuncParams(func.getFuncFParams(), ue.getFuncRParams());
-                }
-            }
-        } else if (astNode instanceof Stmt && ((Stmt) astNode).getType() == Stmt.StmtType.RETURN) {
-            if (curFunc.getType().toString().equals("VoidFunc") && !astNode.getAstChild().isEmpty()) {
-                errors.add(new Error("f", ((Stmt) astNode).getLineno()));
-            }
-        } else if (astNode instanceof Stmt && ((Stmt) astNode).getType() == Stmt.StmtType.FOR) {
-            blockStack.push(BlockType.forBlock);
-        } else if (astNode instanceof Stmt && (((Stmt) astNode).getType() == Stmt.StmtType.BREAK
-                || ((Stmt) astNode).getType() == Stmt.StmtType.CONTINUE)) {
-            BlockType bt = blockStack.peek();
-            if (bt != BlockType.forBlock) {
-                errors.add(new Error("m", ((Stmt) astNode).getLineno()));
-            }
-        } else if (astNode instanceof Stmt && ((Stmt) astNode).getType() == Stmt.StmtType.PRINTF) {
-            Stmt printf = (Stmt) astNode;
-            if (printf.FormatNum() != printf.getAstChild().size()) {
-                errors.add(new Error("l", printf.getLineno()));
-            }
-        } else if (astNode instanceof Stmt && !astNode.getAstChild().isEmpty() && astNode.getAstChild().get(0) instanceof LVal) {
-            String name = ((LVal) astNode.getAstChild().get(0)).getIdentName();
-            if (findSymInStack(name, "Var")) {
-                Symbol sym = getSymInStack(name, "Var");
-                if (sym.getType().isConst()) {
-                    if (((Stmt) astNode).iaNormalAssign()) {
-                        errors.add(new Error("h", ((Stmt) astNode).getLineno()));
-                    }
-                }
-            }
-        } else if (astNode instanceof ForStmt) {
-            String name = ((LVal) astNode.getAstChild().get(0)).getIdentName();
-            if (findSymInStack(name, "Var")) {
-                Symbol sym = getSymInStack(name, "Var");
-                if (sym.getType().isConst()) {
-                    errors.add(new Error("h", ((ForStmt) astNode).getLineno()));
-                }
+    public void visitFuncDef(FuncDef fd) {
+        String funcType = getType(fd.getFuncType().getType());
+        SymType ft = new SymType(funcType, false, false, true);
+        String funcName = fd.getIdent().getContent();
+        try {
+            Function func = new Function(funcName, ft, curDepth, fd.getFuncType().getType().getLineno(), fd.getArgc());
+            if (fd.hasFParams()) { func.setFuncFParams(fd.getFuncFParams()); }
+            curFunc = func;
+            symStack.push(func);
+            curTable.addSymItem(funcName, func);
+            funcNameTable.put(funcName, func);
+            nodeSymbolNap.put(fd, func);
+        } catch (Error e) {
+            errors.add(new Error("b", fd.getFuncType().getType().getLineno()));
+        }
+        // 形参需要加入符号表，但属于下一层级
+        blockStack.push(BlockType.FuncBlock);
+        visit(fd.getBlock(), fd.getFuncFParams());  // 构建函数内符号表
+        if (!ft.toString().equals("VoidFunc") && !fd.getBlock().hasRet()) {
+            errors.add(new Error("g", fd.getBlock().getLineno()));
+        }
+    }
+
+    public void visitBlock(FuncFParams fps) {
+        curDepth++;
+        curTable = new SymbolTable(curTable, curDepth);
+        symbolTables.add(curTable); // 将符号表加入符号表集
+        tableStack.push(curTable); // 入栈
+        if (fps != null) {
+            try {
+                visitFuncFParams(fps);  // 函数形参与函数块内符号属于同一层级
+            } catch (Error e) { errors.add(e); }
+        }
+    }
+
+    public void visitConstDecl(ConstDecl cd) {
+        String varType = getType(cd.getType()); // Int or Char
+        for (AstNode astChild : cd.getAstChild()) {
+            try {
+                visitConstDef(varType, (ConstDef) astChild);
+            } catch (Error e) {
+                errors.add(new Error("b", ((ConstDef) astChild).getIdent().getLineno()));
             }
         }
+    }
+
+    public void visitMainFuncDef(MainFuncDef astNode) {
+        SymType st = new SymType("Int", false, false, true);
+        curFunc = new Function("main", st, curDepth, (astNode).getLineno(), 0);
+        if (!(astNode).getBlock().hasRet()) {
+            errors.add(new Error("g", (astNode).getBlock().getLineno()));
+        }
+        blockStack.push(BlockType.FuncBlock);
     }
 
     public void visitConstDef(String varType, ConstDef constDef) throws Error {
@@ -235,6 +183,17 @@ public class Visitor {
         curTable.addSymItem(varName, var);
         symStack.push(var);
         nodeSymbolNap.put(constDef, var);
+    }
+
+    public void visitVarDecl(VarDecl vd) {
+        String vaType = getType(vd.getType());
+        for (AstNode node: vd.getAstChild()) {
+            try {
+                visitVarDef(vaType, (VarDef) node);
+            } catch (Error e) {
+                errors.add(new Error("b", ((VarDef) node).getIdent().getLineno()));
+            }
+        }
     }
 
     public void visitVarDef(String varType, VarDef varDef) throws Error {
@@ -332,6 +291,64 @@ public class Visitor {
             return "Void";
         } else {
             return null;
+        }
+    }
+
+    public void checkError(AstNode astNode) {
+        if (astNode instanceof LVal) {
+            String name = ((LVal) astNode).getIdent().getContent();
+            if (!findSymInStack(name, "Var")) {
+                errors.add(new Error("c", ((LVal) astNode).getIdent().getLineno()));
+            }
+        } else if (astNode instanceof UnaryExp && ((UnaryExp)astNode).isIdent()) {
+            String name = ((UnaryExp) astNode).getIdent().getContent();
+            if (!findSymInStack(name, "Func")) {
+                errors.add(new Error("c", ((UnaryExp) astNode).getIdent().getLineno()));
+            }
+            if (((UnaryExp) astNode).hasFuncRParams() && funcNameTable.containsKey(name)) {
+                UnaryExp ue = (UnaryExp) astNode;
+                Function func = (Function) funcNameTable.get(name);
+                if (func != null && ue.getArgc() != func.getArgc()) {
+                    errors.add(new Error("d", ue.getLineno()));
+                } else if (func != null) {
+                    checkFuncParams(func.getFuncFParams(), ue.getFuncRParams());
+                }
+            }
+        } else if (astNode instanceof Stmt && ((Stmt) astNode).getType() == Stmt.StmtType.RETURN) {
+            if (curFunc.getType().toString().equals("VoidFunc") && !astNode.getAstChild().isEmpty()) {
+                errors.add(new Error("f", ((Stmt) astNode).getLineno()));
+            }
+        } else if (astNode instanceof Stmt && ((Stmt) astNode).getType() == Stmt.StmtType.FOR) {
+            blockStack.push(BlockType.forBlock);
+        } else if (astNode instanceof Stmt && (((Stmt) astNode).getType() == Stmt.StmtType.BREAK
+                || ((Stmt) astNode).getType() == Stmt.StmtType.CONTINUE)) {
+            BlockType bt = blockStack.peek();
+            if (bt != BlockType.forBlock) {
+                errors.add(new Error("m", ((Stmt) astNode).getLineno()));
+            }
+        } else if (astNode instanceof Stmt && ((Stmt) astNode).getType() == Stmt.StmtType.PRINTF) {
+            Stmt printf = (Stmt) astNode;
+            if (printf.FormatNum() != printf.getAstChild().size()) {
+                errors.add(new Error("l", printf.getLineno()));
+            }
+        } else if (astNode instanceof Stmt && !astNode.getAstChild().isEmpty() && astNode.getAstChild().get(0) instanceof LVal) {
+            String name = ((LVal) astNode.getAstChild().get(0)).getIdentName();
+            if (findSymInStack(name, "Var")) {
+                Symbol sym = getSymInStack(name, "Var");
+                if (sym.getType().isConst()) {
+                    if (((Stmt) astNode).iaNormalAssign()) {
+                        errors.add(new Error("h", ((Stmt) astNode).getLineno()));
+                    }
+                }
+            }
+        } else if (astNode instanceof ForStmt) {
+            String name = ((LVal) astNode.getAstChild().get(0)).getIdentName();
+            if (findSymInStack(name, "Var")) {
+                Symbol sym = getSymInStack(name, "Var");
+                if (sym.getType().isConst()) {
+                    errors.add(new Error("h", ((ForStmt) astNode).getLineno()));
+                }
+            }
         }
     }
 }
