@@ -19,7 +19,7 @@
 | id     | 存储标识符名称                 | position   | 查找标识符在符号表位置 | interpret | 对目标代码的解释执行程序   |
 | getsym | 词法分析的入口函数             | listcode   | 列出目标代码清单       | base      | 通过静态链求出数据区基地址 |
 | getch  | 漏掉空格，读取一个字符         | statement  | 语句部分处理           | error     | 错误处理程序               |
-| gen    | 生成目标代码，并送入目标程序区 | expression | 表达式处理             | table     | 符号表                     |
+| gen    | 生成目标代码，并送入目标程序区 | expression | 表达式处理             | middle     | 符号表                     |
 | test   | 测试当前单词是否合法           | term       | 项处理                 | code      | 生成的指令序列             |
 
 ### 文件组织

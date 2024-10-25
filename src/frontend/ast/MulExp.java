@@ -29,6 +29,10 @@ public class MulExp implements AstNode {
         return "";
     }
 
+    public ArrayList<UnaryExp> getUnaryExps() {
+        return unaryExps;
+    }
+
     public int getLineno() {
         return unaryExps.get(0).getLineno();
     }

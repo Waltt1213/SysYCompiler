@@ -11,6 +11,10 @@ public class Cond implements AstNode {
         this.lorExp = lorExp;
     }
 
+    public LOrExp getLorExp() {
+        return lorExp;
+    }
+
     @Override
     public String getSymbol() {
         return "<Cond>";

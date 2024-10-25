@@ -16,6 +16,18 @@ public class CompUnit implements AstNode {
         this.mainFuncDef = mainFuncDef;
     }
 
+    public ArrayList<AstNode> getDecls() {
+        return decls;
+    }
+
+    public ArrayList<FuncDef> getFuncDefs() {
+        return funcDefs;
+    }
+
+    public MainFuncDef getMainFuncDef() {
+        return mainFuncDef;
+    }
+
     @Override
     public String getSymbol() {
         return "<CompUnit>";

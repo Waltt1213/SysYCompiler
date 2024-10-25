@@ -13,6 +13,10 @@ public class LAndExp implements AstNode {
         this.eqExps = eqExps;
     }
 
+    public ArrayList<EqExp> getEqExps() {
+        return eqExps;
+    }
+
     @Override
     public String getSymbol() {
         return "<LAndExp>";

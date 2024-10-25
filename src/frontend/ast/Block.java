@@ -17,6 +17,10 @@ public class Block implements AstNode {
         this.lineno = lineno;
     }
 
+    public ArrayList<AstNode> getBlockItems() {
+        return blockItems;
+    }
+
     public int getLineno() {
         return lineno;
     }

@@ -30,6 +30,14 @@ public class ConstInitVal implements AstNode {
         this.stringConst = stringConst;
     }
 
+    public ConstExp getConstExp() {
+        return constExp;
+    }
+
+    public ArrayList<ConstExp> getConstExps() {
+        return constExps;
+    }
+
     public boolean isConstExp() {
         return constExp != null && constExps == null && stringConst == null;
     }

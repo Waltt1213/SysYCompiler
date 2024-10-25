@@ -1,4 +1,4 @@
-package table;
+package middle.symbol;
 
 import frontend.ast.AstNode;
 import frontend.ast.ConstInitVal;

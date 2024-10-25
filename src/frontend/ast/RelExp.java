@@ -15,6 +15,10 @@ public class RelExp implements AstNode {
         this.ops = ops;
     }
 
+    public ArrayList<AddExp> getAddExps() {
+        return addExps;
+    }
+
     @Override
     public String getSymbol() {
         return "<RelExp>";

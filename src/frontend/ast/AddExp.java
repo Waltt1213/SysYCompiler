@@ -33,6 +33,14 @@ public class AddExp implements AstNode {
         return "";
     }
 
+    public ArrayList<MulExp> getMulExps() {
+        return mulExps;
+    }
+
+    public ArrayList<Token> getOps() {
+        return ops;
+    }
+
     @Override
     public String getSymbol() {
         return "<AddExp>";

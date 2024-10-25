@@ -1,4 +1,4 @@
-package table;
+package middle.symbol;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

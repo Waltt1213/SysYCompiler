@@ -11,6 +11,10 @@ public class ConstExp implements AstNode {
         this.addExp = addExp;
     }
 
+    public AddExp getAddExp() {
+        return addExp;
+    }
+
     @Override
     public String getSymbol() {
         return "<ConstExp>";

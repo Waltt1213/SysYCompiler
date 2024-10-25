@@ -40,6 +40,10 @@ public class VarDef implements AstNode {
         return ident;
     }
 
+    public ConstExp getConstExp() {
+        return constExp;
+    }
+
     public InitVal getInitVal() {
         if (hasInitVal()) {
             return initVal;

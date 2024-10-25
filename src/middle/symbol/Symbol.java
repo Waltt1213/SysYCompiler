@@ -1,4 +1,4 @@
-package table;
+package middle.symbol;
 
 public class Symbol {
     private final String name;

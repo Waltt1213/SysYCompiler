@@ -30,6 +30,14 @@ public class InitVal implements AstNode {
         this.stringConst = stringConst;
     }
 
+    public Exp getExp() {
+        return exp;
+    }
+
+    public ArrayList<Exp> getExps() {
+        return exps;
+    }
+
     public boolean isExp() {
         return exp != null;
     }

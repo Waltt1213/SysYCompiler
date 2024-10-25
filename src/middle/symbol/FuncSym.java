@@ -1,13 +1,13 @@
-package table;
+package middle.symbol;
 
 import frontend.ast.FuncFParams;
 
-public class Function extends Symbol {
+public class FuncSym extends Symbol {
     private int argc;
     private FuncFParams funcFParams;
 
-    public Function(String name, SymType type, int depth,
-                    int lineno, int argc) {
+    public FuncSym(String name, SymType type, int depth,
+                   int lineno, int argc) {
         super(name, type, depth, lineno);
         this.argc = argc;
     }

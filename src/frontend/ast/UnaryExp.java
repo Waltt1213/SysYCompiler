@@ -91,6 +91,14 @@ public class UnaryExp implements AstNode {
         return primaryExp != null;
     }
 
+    public PrimaryExp getPrimaryExp() {
+        return primaryExp;
+    }
+
+    public UnaryExp getUnaryExp() {
+        return unaryExp;
+    }
+
     public boolean isIdent() {
         return ident != null;
     }

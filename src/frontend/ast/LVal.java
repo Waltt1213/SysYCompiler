@@ -37,6 +37,10 @@ public class LVal implements AstNode {
         return exp != null;
     }
 
+    public Exp getExp() {
+        return exp;
+    }
+
     @Override
     public String getSymbol() {
         return "<LVal>";

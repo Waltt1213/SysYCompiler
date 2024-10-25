@@ -1,6 +1,6 @@
 import frontend.Lexer;
 import frontend.Parser;
-import table.Visitor;
+import middle.Visitor;
 
 import java.io.IOException;
 
@@ -23,7 +23,7 @@ public class Compiler {
         // Step 4: go to Semantic Analysis and build Symbol Table
         // then print the result and errors from visitor
         Visitor visitor = new Visitor(parser.getCompUnit(), parser.getErrors());
-        visitor.buildSymTable();
+        visitor.buildIR();
         FileIO.printSymTableResult(visitor.getSymbolTables());
         FileIO.printError(visitor.getErrors());
     }

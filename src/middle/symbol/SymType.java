@@ -1,4 +1,4 @@
-package table;
+package middle.symbol;
 
 public class SymType {
     private final String type; // int or char

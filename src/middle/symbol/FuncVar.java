@@ -1,4 +1,4 @@
-package table;
+package middle.symbol;
 
 public class FuncVar extends Symbol {
     private final String funcName;

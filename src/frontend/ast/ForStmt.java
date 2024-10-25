@@ -17,6 +17,14 @@ public class ForStmt implements AstNode {
         this.lineno = exp.getLineno();
     }
 
+    public Exp getExp() {
+        return exp;
+    }
+
+    public LVal getLval() {
+        return lval;
+    }
+
     public int getLineno() {
         return lineno;
     }

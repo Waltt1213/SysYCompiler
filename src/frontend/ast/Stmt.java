@@ -38,6 +38,10 @@ public class Stmt implements AstNode {
                 || type == StmtType.GETINT;
     }
 
+    public ArrayList<AstNode> getStmts() {
+        return stmts;
+    }
+
     public boolean isForAssign() {
         return type == StmtType.FOR;
     }

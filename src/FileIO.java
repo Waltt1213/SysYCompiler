@@ -2,14 +2,12 @@ import frontend.Error;
 import frontend.Token;
 import frontend.TokenType;
 import frontend.ast.CompUnit;
-import table.Symbol;
-import table.SymbolTable;
+import middle.symbol.SymbolTable;
 
 import java.io.*;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Map;
 
 public class FileIO {
     private static final String testFilePath = String.valueOf(Paths.get("testfile.txt"));

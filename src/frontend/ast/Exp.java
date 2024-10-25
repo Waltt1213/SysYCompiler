@@ -23,6 +23,10 @@ public class Exp implements AstNode {
         return addExp.getLineno();
     }
 
+    public AddExp getAddExp() {
+        return addExp;
+    }
+
     @Override
     public String getSymbol() {
         return "<Exp>";

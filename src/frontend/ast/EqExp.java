@@ -15,6 +15,10 @@ public class EqExp implements AstNode {
         this.ops = ops;
     }
 
+    public ArrayList<RelExp> getRelExps() {
+        return relExps;
+    }
+
     @Override
     public String getSymbol() {
         return "<EqExp>";

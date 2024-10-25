@@ -13,6 +13,10 @@ public class LOrExp implements AstNode {
         this.lAndExps = lAndExps;
     }
 
+    public ArrayList<LAndExp> getLAndExps() {
+        return lAndExps;
+    }
+
     @Override
     public String getSymbol() {
         return "<LOrExp>";
