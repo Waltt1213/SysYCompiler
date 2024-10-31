@@ -20,11 +20,14 @@ public class Compiler {
         parser.analyzeTokens();
         FileIO.printParserResult(parser.getCompUnit());
 
-        // Step 4: go to Semantic Analysis and build Symbol Table
-        // then print the result and errors from visitor
+        // Step 4: go to Semantic Analysis and build LLVM IR
+        // print the Symbol Table and errors from visitor
         Visitor visitor = new Visitor(parser.getCompUnit(), parser.getErrors());
         visitor.buildIR();
         FileIO.printSymTableResult(visitor.getSymbolTables());
         FileIO.printError(visitor.getErrors());
+
+        // Step 5: print the LLVM IR
+        FileIO.printLlvmIrResult(visitor.getModule());
     }
 }

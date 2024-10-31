@@ -2,6 +2,7 @@ import frontend.Error;
 import frontend.Token;
 import frontend.TokenType;
 import frontend.ast.CompUnit;
+import llvmir.Module;
 import middle.SymbolTable;
 
 import java.io.*;
@@ -15,6 +16,7 @@ public class FileIO {
     private static final String errorFilePath = String.valueOf(Paths.get("error.txt"));
     private static final String parserFilePath = String.valueOf(Paths.get("parser.txt"));
     private static final String symbolFilePath = String.valueOf(Paths.get("symbol.txt"));
+    private static final String llvmIrFilePath = String.valueOf(Paths.get("llvm_ir.txt"));
 
     public static String readTestFile() throws IOException {
         FileReader fr = new FileReader(testFilePath);
@@ -77,6 +79,14 @@ public class FileIO {
             String line = error.toString() + "\n";
             bw.write(line);
         }
+        bw.close();
+        fw.close();
+    }
+
+    public static void printLlvmIrResult(Module module) throws IOException {
+        FileWriter fw = new FileWriter(llvmIrFilePath);
+        BufferedWriter bw = new BufferedWriter(fw);
+        bw.write(module.toString());
         bw.close();
         fw.close();
     }

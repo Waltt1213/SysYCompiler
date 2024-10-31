@@ -1,10 +1,11 @@
 package llvmir.values.instr;
 
 import llvmir.DataType;
+import llvmir.values.BasicBlock;
 
-public class Branch extends Instr {
+public class Branch extends Instruction {
 
-    public Branch(DataType vt, String name) {
-        super(vt, name);
+    public Branch(DataType vt, BasicBlock basicBlock) {
+        super(vt, Type.BR, basicBlock);
     }
 }

@@ -59,7 +59,6 @@ public class Function extends Value {
         StringBuilder sb = new StringBuilder();
         if (isDefine) {
             sb.append("define dso_local ").append(tp.toString()).append(" ");
-            sb.append("@").append(name);
             sb.append("@").append(name).append("(");
             for (int i = 0; i < funcFParams.size(); i++) {
                 sb.append(funcFParams.get(i).toString());
@@ -81,7 +80,7 @@ public class Function extends Value {
                     sb.append(", ");
                 }
             }
-            sb.append(")\n");
+            sb.append(")");
         }
         return sb.toString();
     }

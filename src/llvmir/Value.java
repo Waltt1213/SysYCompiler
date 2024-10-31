@@ -6,6 +6,9 @@ import java.util.ArrayList;
 public class Value {
     protected String name;
     protected DataType tp;    // 返回值类型
+    protected String id = localId;
+    public static String globalId = "@";
+    public static String localId = "%";
     protected ArrayList<User> usersList; // 使用这个value的user
 
     public Value(DataType vt, String name) {
@@ -28,6 +31,6 @@ public class Value {
 
     @Override
     public String toString() {
-        return name;
+        return tp.toString() + " " + id + name;
     }
 }

@@ -1,9 +1,9 @@
 package llvmir.values;
 
 import llvmir.DataType;
-import llvmir.User;
+import llvmir.Value;
 
-public class Constant extends User {
+public class Constant extends Value {
     public Constant(DataType vt, String name) {
         super(vt, name);
     }

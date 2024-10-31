@@ -6,9 +6,11 @@ import frontend.TokenType;
 import frontend.ast.*;
 import llvmir.DataType;
 import llvmir.Module;
+import llvmir.Value;
 import llvmir.values.Argument;
 import llvmir.values.BasicBlock;
 import llvmir.values.Function;
+import llvmir.values.instr.Return;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -20,16 +22,15 @@ public class Visitor {
     private final CompUnit root;
     private final ArrayList<SymbolTable> symbolTables;    //  符号表集
     private final ArrayDeque<SymbolTable> tableStack;     // 符号表栈
-    private final HashMap<Token, Symbol> nodeSymbolNap; // node-symbol对应表
     private final ArrayDeque<Symbol> symStack;            // 符号栈
     private final Module module = new Module(VoidTy, "global");
     private final HashMap<String, Symbol> funcNameTable;
     private final ArrayDeque<BlockType> blockStack;
-    private final SymbolTable globalTable;
     private SymbolTable curTable;
     private int curDepth;
     private Function curFunction;
-    private final ArrayList<Error> errors;
+    private BasicBlock curBasicBlock;
+    private final ArrayList<Error> errors;  // 错误处理
 
     private enum BlockType {
         forBlock, FuncBlock
@@ -43,16 +44,16 @@ public class Visitor {
         symStack = new ArrayDeque<>();
         funcNameTable = new HashMap<>();
         blockStack = new ArrayDeque<>();
-        nodeSymbolNap = new HashMap<>();
-        globalTable = new SymbolTable(null, curDepth);
         this.errors = errors;
     }
 
     public void buildIR() {
-        curTable = globalTable;
+        curTable = new SymbolTable(null, curDepth);
         tableStack.push(curTable);
         symbolTables.add(curTable);
         curFunction = null;
+        curBasicBlock = null;
+        buildDeclare();
         visitCompUnit(root);
         tableStack.clear();
         symStack.clear();
@@ -85,12 +86,8 @@ public class Visitor {
         return symbolTables;
     }
 
-    public HashMap<Token, Symbol> getNodeSymbolNap() {
-        return nodeSymbolNap;
-    }
-
-    public HashMap<String, Symbol> getFuncNameTable() {
-        return funcNameTable;
+    public Module getModule() {
+        return module;
     }
 
     public ArrayList<Error> getErrors() {
@@ -124,11 +121,11 @@ public class Visitor {
 
         Function putch = new Function(VoidTy,"putch", module, false);
         module.addFunction(putch);
-        putint.addParams(new Argument(Integer32Ty, "param"));
+        putch.addParams(new Argument(Integer32Ty, "param"));
 
         Function putstr = new Function(VoidTy,"putstr", module, false);
         module.addFunction(putstr);
-        putint.addParams(new Argument(Pointer8Ty, "param"));
+        putstr.addParams(new Argument(Pointer8Ty, "param"));
     }
 
     public void visitFuncDef(FuncDef fd) {
@@ -148,10 +145,9 @@ public class Visitor {
             symStack.push(funcSym);
             curTable.addSymItem(funcName, funcSym);
             funcNameTable.put(funcName, funcSym);
-            nodeSymbolNap.put(fd.getIdent(), funcSym);
             // 创建一个基本块
-            BasicBlock basicBlock = new BasicBlock(LabelTy, "");
-            function.addBasicBlock(basicBlock);
+            curBasicBlock = new BasicBlock(LabelTy, "");
+            function.addBasicBlock(curBasicBlock);
         } catch (Error e) {
             errors.add(new Error("b", fd.getFuncType().getType().getLineno()));
         }
@@ -175,6 +171,7 @@ public class Visitor {
                 visitFuncFParams(fps);  // 函数形参与函数块内符号属于同一层级
             } catch (Error e) { errors.add(e); }
         }
+        curBasicBlock.setName(SlotTracker.slot()); // 基本块占一个%
         for (AstNode blockItem: block.getBlockItems()) {
             if (blockItem instanceof ConstDecl) {
                 visitConstDecl((ConstDecl) blockItem);
@@ -202,31 +199,32 @@ public class Visitor {
     }
 
     public void visitMainFuncDef(MainFuncDef astNode) {
+        // 归零
+        SlotTracker.reset();
         // 创建main函数
         Function main = new Function(Integer32Ty, "main", module, true);
-        module.addFunction(main);
         curFunction = main;
+        // 加入module
+        module.addFunction(main);
+        // 添加一个基本块
+        curBasicBlock = new BasicBlock(LabelTy, SlotTracker.slot());
+        main.addBasicBlock(curBasicBlock);
         if (!astNode.getBlock().hasRet()) {
             errors.add(new Error("g", (astNode).getBlock().getLineno()));
         }
         blockStack.push(BlockType.FuncBlock);
+
         visitBlock(astNode.getBlock(), null);
     }
 
     public void visitConstDef(String varType, ConstDef constDef) throws Error {
         String varName = constDef.getIdent().getContent();
         boolean isArray = constDef.hasArray();
-        SymType st;
-        if (isArray) {
-            st = new SymType(varType, true, true, false); //TODO
-        } else {
-            st = new SymType(varType, false, true, false);
-        }
+        SymType st = new SymType(varType, isArray, true, false); //TODO
         ConstInitVal civ = constDef.getConstInitVal();
         Symbol var = new Symbol(varName, st, curDepth, constDef.getIdent().getLineno());
         curTable.addSymItem(varName, var);
         symStack.push(var);
-        nodeSymbolNap.put(constDef.getIdent(), var);
         if (constDef.hasArray()) {
             visitConstExp(constDef.getConstExp());
         }
@@ -271,7 +269,6 @@ public class Visitor {
         Symbol var = new Symbol(varName, st, curDepth, varDef.getIdent().getLineno());
         curTable.addSymItem(varName, var);
         symStack.push(var);
-        nodeSymbolNap.put(varDef.getIdent(), var);
         if (varDef.hasConstExp()) {
             visitConstExp(varDef.getConstExp());
         }
@@ -295,31 +292,20 @@ public class Visitor {
             FuncFParam fp = (FuncFParam) node;
             String funcVarName = fp.getIdentName();
             String funcVarType = getType(fp.getType());
-            // 创建参数
+            // 创建参数并加入函数
             Argument argument = new Argument(getDataType(funcVarType), SlotTracker.slot());
-            // Function currentFunc = (Function) curFunc.getValue();
             curFunction.addParams(argument);
-            SymType st;
-            if (fp.isArray()) {
-                st = new SymType(funcVarType, true, false, false);
-            } else {
-                st = new SymType(funcVarType, false, false, false);
-            }
+            // 加入符号表
+            SymType st = new SymType(funcVarType, fp.isArray(), false, false);
             Symbol symbol = new Symbol(funcVarName, st, curDepth, fp.getIdent().getLineno());
             curTable.addSymItem(funcVarName, symbol);
             symStack.push(symbol);
-            nodeSymbolNap.put(fp.getIdent(), symbol);
         }
     }
 
     public void visitStmt(Stmt stmt) {
         if (stmt.getType() == Stmt.StmtType.RETURN) {
-            if (curFunction.getTp().toString().equals("void") && !stmt.getStmts().isEmpty()) {
-                errors.add(new Error("f", stmt.getLineno()));
-            }
-            if (!stmt.getStmts().isEmpty()) {
-                visitAddExp(((Exp) stmt.getStmts().get(0)).getAddExp());
-            }
+            visitReturn(stmt);
         } else if (stmt.getType() == Stmt.StmtType.IF) {
             visitLOrExp(((Cond) stmt.getStmts().get(0)).getLorExp());
             visitStmt((Stmt) stmt.getStmts().get(1));
@@ -372,6 +358,18 @@ public class Visitor {
         }
     }
 
+    public void visitReturn(Stmt stmt) {
+        if (curFunction.getTp().toString().equals("void") && !stmt.getStmts().isEmpty()) {
+            errors.add(new Error("f", stmt.getLineno()));
+        }
+        if (!stmt.getStmts().isEmpty()) {
+            Value ret = visitAddExp(((Exp) stmt.getStmts().get(0)).getAddExp());
+            curBasicBlock.appendInstr(new Return(curBasicBlock, ret));
+        } else {
+            curBasicBlock.appendInstr(new Return(curBasicBlock));
+        }
+    }
+
     public void visitForStmt(ForStmt forStmt) {
         String name = forStmt.getLval().getIdentName();
         if (findSymInStack(name, "Var")) {
@@ -408,16 +406,21 @@ public class Visitor {
         }
     }
 
-    public void visitAddExp(AddExp addExp) {
+    public Value visitAddExp(AddExp addExp) {
+        if (addExp.getMulExps().size() == 1) {
+            return visitMulExp(addExp.getMulExps().get(0));
+        }
         for (MulExp mulExp : addExp.getMulExps()) {
             visitMulExp(mulExp);
         }
+        return null;
     }
 
-    public void visitMulExp(MulExp mulExp) {
+    public Value visitMulExp(MulExp mulExp) {
         for (UnaryExp unaryExp : mulExp.getUnaryExps()) {
             visitUnaryExp(unaryExp);
         }
+        return null;
     }
 
     public void visitUnaryExp(UnaryExp unaryExp) {
@@ -434,7 +437,6 @@ public class Visitor {
                     visitFuncRParams(func.getFuncFParams(), unaryExp.getFuncRParams());
                 }
             }
-            nodeSymbolNap.put(unaryExp.getIdent(), getSymInStack(name, "Func"));
         } else if (unaryExp.isPrimaryExp()) {
             visitPrimaryExp(unaryExp.getPrimaryExp());
         } else {
@@ -456,7 +458,6 @@ public class Visitor {
         if (!findSymInStack(name, "Var")) {
             errors.add(new Error("c", lVal.getIdent().getLineno()));
         }
-        nodeSymbolNap.put(lVal.getIdent(), getSymInStack(name, "Var"));
         if (lVal.isArray()) {
             visitAddExp(lVal.getExp().getAddExp());
         }
