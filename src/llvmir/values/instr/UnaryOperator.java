@@ -1,10 +1,10 @@
 package llvmir.values.instr;
 
-import llvmir.TypeId;
+import llvmir.DataType;
 
 public class UnaryOperator extends Instr {
 
-    public UnaryOperator(TypeId vt, String name) {
+    public UnaryOperator(DataType vt, String name) {
         super(vt, name);
     }
 }

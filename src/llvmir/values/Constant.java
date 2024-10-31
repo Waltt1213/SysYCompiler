@@ -1,10 +1,10 @@
 package llvmir.values;
 
-import llvmir.TypeId;
-import llvmir.Value;
+import llvmir.DataType;
+import llvmir.User;
 
-public class Constant extends Value {
-    public Constant(TypeId vt, String name) {
+public class Constant extends User {
+    public Constant(DataType vt, String name) {
         super(vt, name);
     }
 }

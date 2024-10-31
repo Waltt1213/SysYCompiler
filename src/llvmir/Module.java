@@ -1,16 +1,16 @@
 package llvmir;
 
 import llvmir.values.Function;
-import llvmir.values.GlobalValue;
+import llvmir.values.GlobalVariable;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
 
 public class Module extends Value {
     private ArrayList<Function> functions;
-    private LinkedList<GlobalValue> globalValues;
+    private LinkedList<GlobalVariable> globalValues;
 
-    public Module(TypeId vt, String name) {
+    public Module(DataType vt, String name) {
         super(vt, name);
         functions = new ArrayList<>();
         globalValues = new LinkedList<>();
@@ -20,7 +20,7 @@ public class Module extends Value {
         functions.add(func);
     }
 
-    public void addGlobalValue(GlobalValue gv) {
+    public void addGlobalValue(GlobalVariable gv) {
         globalValues.add(gv);
     }
 
@@ -30,7 +30,7 @@ public class Module extends Value {
         for (Function function : functions) {
             sb.append(function.toString()).append('\n');
         }
-        for (GlobalValue globalValue : globalValues) {
+        for (GlobalVariable globalValue : globalValues) {
             sb.append(globalValue.toString()).append('\n');
         }
         return sb.toString();

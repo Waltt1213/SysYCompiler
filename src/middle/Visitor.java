@@ -4,14 +4,17 @@ import frontend.Error;
 import frontend.Token;
 import frontend.TokenType;
 import frontend.ast.*;
+import llvmir.DataType;
 import llvmir.Module;
-import middle.symbol.*;
+import llvmir.values.Argument;
+import llvmir.values.BasicBlock;
+import llvmir.values.Function;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import static llvmir.TypeId.VoidTyID;
+import static llvmir.DataType.*;
 
 public class Visitor {
     private final CompUnit root;
@@ -19,13 +22,13 @@ public class Visitor {
     private final ArrayDeque<SymbolTable> tableStack;     // 符号表栈
     private final HashMap<Token, Symbol> nodeSymbolNap; // node-symbol对应表
     private final ArrayDeque<Symbol> symStack;            // 符号栈
-    private final Module module = new Module(VoidTyID, "global");
+    private final Module module = new Module(VoidTy, "global");
     private final HashMap<String, Symbol> funcNameTable;
     private final ArrayDeque<BlockType> blockStack;
     private final SymbolTable globalTable;
     private SymbolTable curTable;
     private int curDepth;
-    private FuncSym curFunc;
+    private Function curFunction;
     private final ArrayList<Error> errors;
 
     private enum BlockType {
@@ -49,7 +52,7 @@ public class Visitor {
         curTable = globalTable;
         tableStack.push(curTable);
         symbolTables.add(curTable);
-        curFunc = null;
+        curFunction = null;
         visitCompUnit(root);
         tableStack.clear();
         symStack.clear();
@@ -108,18 +111,47 @@ public class Visitor {
         visitMainFuncDef(compUnit.getMainFuncDef());
     }
 
+    public void buildDeclare() {
+        Function getint = new Function(Integer32Ty,"getint", module, false);
+        module.addFunction(getint);
+
+        Function getChar = new Function(Integer32Ty,"getchar", module, false);
+        module.addFunction(getChar);
+
+        Function putint = new Function(VoidTy,"putint", module, false);
+        module.addFunction(putint);
+        putint.addParams(new Argument(Integer32Ty, "param"));
+
+        Function putch = new Function(VoidTy,"putch", module, false);
+        module.addFunction(putch);
+        putint.addParams(new Argument(Integer32Ty, "param"));
+
+        Function putstr = new Function(VoidTy,"putstr", module, false);
+        module.addFunction(putstr);
+        putint.addParams(new Argument(Pointer8Ty, "param"));
+    }
+
     public void visitFuncDef(FuncDef fd) {
+        SlotTracker.reset();
         String funcType = getType(fd.getFuncType().getType());
         SymType ft = new SymType(funcType, false, false, true);
         String funcName = fd.getIdent().getContent();
         try {
-            FuncSym func = new FuncSym(funcName, ft, curDepth, fd.getFuncType().getType().getLineno(), fd.getArgc());
-            if (fd.hasFParams()) { func.setFuncFParams(fd.getFuncFParams()); }
-            curFunc = func;
-            symStack.push(func);
-            curTable.addSymItem(funcName, func);
-            funcNameTable.put(funcName, func);
-            nodeSymbolNap.put(fd.getIdent(), func);
+            // 创建函数并加入module
+            Function function = new Function(getDataType(funcType), funcName, module, true);
+            module.addFunction(function);
+            // 加入符号表
+            Symbol funcSym = new Symbol(funcName, ft, curDepth, fd.getFuncType().getType().getLineno());
+            if (fd.hasFParams()) { funcSym.setFuncFParams(fd.getFuncFParams()); }
+            funcSym.setValue(function);
+            curFunction = function;
+            symStack.push(funcSym);
+            curTable.addSymItem(funcName, funcSym);
+            funcNameTable.put(funcName, funcSym);
+            nodeSymbolNap.put(fd.getIdent(), funcSym);
+            // 创建一个基本块
+            BasicBlock basicBlock = new BasicBlock(LabelTy, "");
+            function.addBasicBlock(basicBlock);
         } catch (Error e) {
             errors.add(new Error("b", fd.getFuncType().getType().getLineno()));
         }
@@ -170,8 +202,10 @@ public class Visitor {
     }
 
     public void visitMainFuncDef(MainFuncDef astNode) {
-        SymType st = new SymType("Int", false, false, true);
-        curFunc = new FuncSym("main", st, curDepth, (astNode).getLineno(), 0);
+        // 创建main函数
+        Function main = new Function(Integer32Ty, "main", module, true);
+        module.addFunction(main);
+        curFunction = main;
         if (!astNode.getBlock().hasRet()) {
             errors.add(new Error("g", (astNode).getBlock().getLineno()));
         }
@@ -189,7 +223,7 @@ public class Visitor {
             st = new SymType(varType, false, true, false);
         }
         ConstInitVal civ = constDef.getConstInitVal();
-        Variable var = new Variable(varName, st, curDepth, constDef.getIdent().getLineno(), civ);
+        Symbol var = new Symbol(varName, st, curDepth, constDef.getIdent().getLineno());
         curTable.addSymItem(varName, var);
         symStack.push(var);
         nodeSymbolNap.put(constDef.getIdent(), var);
@@ -234,7 +268,7 @@ public class Visitor {
             st = new SymType(varType, false, false, false);
         }
         InitVal iv = varDef.getInitVal();
-        Variable var = new Variable(varName, st, curDepth, varDef.getIdent().getLineno(), iv);
+        Symbol var = new Symbol(varName, st, curDepth, varDef.getIdent().getLineno());
         curTable.addSymItem(varName, var);
         symStack.push(var);
         nodeSymbolNap.put(varDef.getIdent(), var);
@@ -261,13 +295,17 @@ public class Visitor {
             FuncFParam fp = (FuncFParam) node;
             String funcVarName = fp.getIdentName();
             String funcVarType = getType(fp.getType());
+            // 创建参数
+            Argument argument = new Argument(getDataType(funcVarType), SlotTracker.slot());
+            // Function currentFunc = (Function) curFunc.getValue();
+            curFunction.addParams(argument);
             SymType st;
             if (fp.isArray()) {
                 st = new SymType(funcVarType, true, false, false);
             } else {
                 st = new SymType(funcVarType, false, false, false);
             }
-            FuncVar symbol = new FuncVar(funcVarName, st, curDepth, fp.getIdent().getLineno(), fps.getFuncName());
+            Symbol symbol = new Symbol(funcVarName, st, curDepth, fp.getIdent().getLineno());
             curTable.addSymItem(funcVarName, symbol);
             symStack.push(symbol);
             nodeSymbolNap.put(fp.getIdent(), symbol);
@@ -276,7 +314,7 @@ public class Visitor {
 
     public void visitStmt(Stmt stmt) {
         if (stmt.getType() == Stmt.StmtType.RETURN) {
-            if (curFunc.getType().toString().equals("VoidFunc") && !stmt.getStmts().isEmpty()) {
+            if (curFunction.getTp().toString().equals("void") && !stmt.getStmts().isEmpty()) {
                 errors.add(new Error("f", stmt.getLineno()));
             }
             if (!stmt.getStmts().isEmpty()) {
@@ -389,11 +427,11 @@ public class Visitor {
                 errors.add(new Error("c", unaryExp.getIdent().getLineno()));
             }
             if (unaryExp.hasFuncRParams() && funcNameTable.containsKey(name)) {
-                FuncSym func = (FuncSym) funcNameTable.get(name);
-                if (func != null && unaryExp.getArgc() != func.getArgc()) {
+                Symbol func = funcNameTable.get(name);
+                if (func != null && unaryExp.getArgc() != ((Function) func.getValue()).getArgc()) {
                     errors.add(new Error("d", unaryExp.getLineno()));
                 } else if (func != null) {
-                    visitFuncParams(func.getFuncFParams(), unaryExp.getFuncRParams());
+                    visitFuncRParams(func.getFuncFParams(), unaryExp.getFuncRParams());
                 }
             }
             nodeSymbolNap.put(unaryExp.getIdent(), getSymInStack(name, "Func"));
@@ -424,7 +462,7 @@ public class Visitor {
         }
     }
 
-    public void visitFuncParams(FuncFParams ffp, FuncRParams frp) {
+    public void visitFuncRParams(FuncFParams ffp, FuncRParams frp) {
         if (ffp.getArgc() != frp.getArgc()) {
             return;
         }
@@ -463,6 +501,16 @@ public class Visitor {
             return "Void";
         } else {
             return null;
+        }
+    }
+
+    public DataType getDataType(String type) {
+        if (type.equals("Int")) {
+            return Integer32Ty;
+        } else if (type.equals("Char")) {
+            return Integer8Ty;
+        } else {
+            return VoidTy;
         }
     }
 }

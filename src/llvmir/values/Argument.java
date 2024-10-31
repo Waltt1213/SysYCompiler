@@ -1,10 +1,15 @@
 package llvmir.values;
 
-import llvmir.TypeId;
+import llvmir.DataType;
 import llvmir.Value;
 
 public class Argument extends Value {
-    public Argument(TypeId vt, String name) {
+    public Argument(DataType vt, String name) {
         super(vt, name);
+    }
+
+    @Override
+    public String toString() {
+        return tp.toString() + " %" + name;
     }
 }

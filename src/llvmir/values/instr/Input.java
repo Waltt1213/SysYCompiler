@@ -1,10 +1,10 @@
 package llvmir.values.instr;
 
-import llvmir.TypeId;
+import llvmir.DataType;
 
 public class Input extends Instr {
 
-    public Input(TypeId vt, String name) {
+    public Input(DataType vt, String name) {
         super(vt, name);
     }
 }

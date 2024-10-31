@@ -1,9 +1,9 @@
 package llvmir.values.instr;
 
-import llvmir.TypeId;
+import llvmir.DataType;
 
 public class Alloca extends Instr {
-    public Alloca(TypeId vt, String name) {
+    public Alloca(DataType vt, String name) {
         super(vt, name);
     }
 }

@@ -2,18 +2,32 @@ package llvmir;
 
 import java.util.ArrayList;
 
+// 一个继承自Value的类意味着，它定义了一个结果，可被其它IR使用。
 public class Value {
-    // private ValueType vt;   // 数据类型
     protected String name;
-    protected TypeId tp;    // 返回值类型
-    protected ArrayList<User> usersList;
-    protected ArrayList<Use> useList;
+    protected DataType tp;    // 返回值类型
+    protected ArrayList<User> usersList; // 使用这个value的user
 
-    public Value(TypeId vt, String name) {
+    public Value(DataType vt, String name) {
         this.name = name;
         this.tp = vt;
-        useList = new ArrayList<>();
         usersList = new ArrayList<>();
     }
 
+    public void addUser(User user) {
+        usersList.add(user);
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public DataType getTp() {
+        return tp;
+    }
+
+    @Override
+    public String toString() {
+        return name;
+    }
 }

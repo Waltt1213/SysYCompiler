@@ -1,10 +1,10 @@
 package llvmir.values.instr;
 
-import llvmir.TypeId;
+import llvmir.DataType;
 
 public class Compare extends Instr {
 
-    public Compare(TypeId vt, String name) {
+    public Compare(DataType vt, String name) {
         super(vt, name);
     }
 }

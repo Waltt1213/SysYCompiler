@@ -2,7 +2,7 @@ import frontend.Error;
 import frontend.Token;
 import frontend.TokenType;
 import frontend.ast.CompUnit;
-import middle.symbol.SymbolTable;
+import middle.SymbolTable;
 
 import java.io.*;
 import java.nio.file.Paths;

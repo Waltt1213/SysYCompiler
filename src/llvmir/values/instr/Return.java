@@ -1,10 +1,10 @@
 package llvmir.values.instr;
 
-import llvmir.TypeId;
+import llvmir.DataType;
 
 public class Return extends Instr {
 
-    public Return(TypeId vt, String name) {
+    public Return(DataType vt, String name) {
         super(vt, name);
     }
 }

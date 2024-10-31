@@ -1,10 +1,10 @@
 package llvmir.values.instr;
 
-import llvmir.TypeId;
+import llvmir.DataType;
 
 public class BinaryOperator extends Instr {
 
-    public BinaryOperator(TypeId vt, String name) {
+    public BinaryOperator(DataType vt, String name) {
         super(vt, name);
     }
 }

@@ -1,11 +1,11 @@
 package llvmir.values.instr;
 
-import llvmir.TypeId;
+import llvmir.DataType;
 import llvmir.User;
 
 public class Instr extends User {
 
-    public Instr(TypeId vt, String name) {
+    public Instr(DataType vt, String name) {
         super(vt, name);
     }
 }

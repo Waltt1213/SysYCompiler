@@ -1,10 +1,10 @@
 package llvmir.values.instr;
 
-import llvmir.TypeId;
+import llvmir.DataType;
 
 public class Store extends Instr {
 
-    public Store(TypeId vt, String name) {
+    public Store(DataType vt, String name) {
         super(vt, name);
     }
 }
