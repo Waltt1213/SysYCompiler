@@ -3,20 +3,20 @@ package llvmir.values.instr;
 import llvmir.DataType;
 import llvmir.Value;
 
-public class BinaryOperator extends Instruction {
+public class Zext extends Instruction {
 
-    public BinaryOperator(DataType vt, Type type, String name) {
-        super(vt, type, name);
+    public Zext(DataType vt, Type irType, String name) {
+        super(vt, irType, name);
     }
 
     @Override
     public String toString() {
+        // <result> = zext <ty> <value> to <ty2>
         StringBuilder sb = new StringBuilder();
         Value value1 = getOperands().get(0);
-        Value value2 = getOperands().get(1);
         sb.append(id).append(name).append(" = ");
-        sb.append(getIrType());
-        sb.append(value1.getDef()).append(", ").append(value2.getName());
+        sb.append("zext ").append(value1.getDef());
+        sb.append(" to ").append(tp);
         return sb.toString();
     }
 }

@@ -29,8 +29,16 @@ public class Value {
         return tp;
     }
 
+    public String getFullName() {
+        return id + name;
+    }
+
+    public String getDef() {
+        return tp.toString() + " " + getFullName();
+    }
+
     @Override
     public String toString() {
-        return tp.toString() + " " + id + name;
+        return getDef();
     }
 }

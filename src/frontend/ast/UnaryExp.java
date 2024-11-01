@@ -111,6 +111,10 @@ public class UnaryExp implements AstNode {
         return funcRParams;
     }
 
+    public String getUnaryOp() {
+        return unaryOp.getOp().getContent();
+    }
+
     public boolean isUnary() {
         return unaryExp != null && unaryOp != null;
     }

@@ -4,19 +4,23 @@ import frontend.Error;
 import frontend.Token;
 import frontend.TokenType;
 import frontend.ast.*;
+import frontend.ast.Character;
+import frontend.ast.Number;
 import llvmir.DataType;
 import llvmir.Module;
 import llvmir.Value;
 import llvmir.values.Argument;
 import llvmir.values.BasicBlock;
+import llvmir.values.Constant;
 import llvmir.values.Function;
-import llvmir.values.instr.Return;
+import llvmir.values.instr.*;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 
 import static llvmir.DataType.*;
+import static llvmir.values.instr.Instruction.*;
 
 public class Visitor {
     private final CompUnit root;
@@ -364,9 +368,9 @@ public class Visitor {
         }
         if (!stmt.getStmts().isEmpty()) {
             Value ret = visitAddExp(((Exp) stmt.getStmts().get(0)).getAddExp());
-            curBasicBlock.appendInstr(new Return(curBasicBlock, ret));
+            curBasicBlock.appendInstr(new Return(null, ret));
         } else {
-            curBasicBlock.appendInstr(new Return(curBasicBlock));
+            curBasicBlock.appendInstr(new Return(null));
         }
     }
 
@@ -406,24 +410,81 @@ public class Visitor {
         }
     }
 
+    public Value getBinInstr(Value value1, Value value2, Type type) {
+        if (value1 instanceof Constant && value2 instanceof Constant) {
+            return calConst((Constant) value1, (Constant) value2, type);
+        } else {
+            Value zextValue1 = zext(value1);
+            Value zextValue2 = zext(value2);
+            BinaryOperator binOp = new BinaryOperator(Integer32Ty, type, SlotTracker.slot());
+            binOp.addOperands(zextValue1);
+            binOp.addOperands(zextValue2);
+            curBasicBlock.appendInstr(binOp);
+            return binOp;
+        }
+    }
+
+    public Constant calConst(Constant value1, Constant value2, Type type) {
+        switch (type) {
+            case ADD:
+                return new Constant(Integer.toString(Integer.parseInt(value1.toString())
+                        + Integer.parseInt(value2.toString())));
+            case SUB:
+                return new Constant(Integer.toString(Integer.parseInt(value1.toString())
+                        - Integer.parseInt(value2.toString())));
+            case MUL:
+                return new Constant(Integer.toString(Integer.parseInt(value1.toString())
+                        * Integer.parseInt(value2.toString())));
+            case SDIV:
+                return new Constant(Integer.toString(Integer.parseInt(value1.toString())
+                        / Integer.parseInt(value2.toString())));
+            case SREM:
+                return new Constant(Integer.toString(Integer.parseInt(value1.toString())
+                        % Integer.parseInt(value2.toString())));
+            default:
+                return null;
+        }
+    }
+
+    public Value zext(Value value) {
+        if (value.getTp() != Integer32Ty) {
+            Zext zext = new Zext(Integer32Ty, Instruction.Type.ZEXT, SlotTracker.slot());
+            zext.addOperands(value);
+            curBasicBlock.appendInstr(zext);
+            return zext;
+        }
+        return value;
+    }
+
     public Value visitAddExp(AddExp addExp) {
         if (addExp.getMulExps().size() == 1) {
             return visitMulExp(addExp.getMulExps().get(0));
         }
-        for (MulExp mulExp : addExp.getMulExps()) {
-            visitMulExp(mulExp);
+        Value res = null;
+        for (int i = 1; i < addExp.getMulExps().size(); i++) {
+            Value value1 = i == 1 ? visitMulExp(addExp.getMulExps().get(0)) : res;
+            Value value2 = visitMulExp(addExp.getMulExps().get(i));
+            // 如果value1 和 value2 是Const
+            res = getBinInstr(value1, value2, Type.getOp(addExp.getOps().get(i - 1).getContent()));
         }
-        return null;
+        return res;
     }
 
     public Value visitMulExp(MulExp mulExp) {
-        for (UnaryExp unaryExp : mulExp.getUnaryExps()) {
-            visitUnaryExp(unaryExp);
+        if (mulExp.getUnaryExps().size() == 1) {
+            return visitUnaryExp(mulExp.getUnaryExps().get(0));
         }
-        return null;
+        Value res = null;
+        for (int i = 1; i < mulExp.getUnaryExps().size(); i++) {
+            Value value1 = i == 1 ? visitUnaryExp(mulExp.getUnaryExps().get(0)) : res;
+            Value value2 = visitUnaryExp(mulExp.getUnaryExps().get(i));
+            // 如果value1 和 value2 是Const
+            res = getBinInstr(value1, value2, Type.getOp(mulExp.getOps().get(i - 1).getContent()));
+        }
+        return res;
     }
 
-    public void visitUnaryExp(UnaryExp unaryExp) {
+    public Value visitUnaryExp(UnaryExp unaryExp) {
         if (unaryExp.isIdent()) {
             String name = unaryExp.getIdentName();
             if (!findSymInStack(name, "Func")) {
@@ -438,19 +499,39 @@ public class Visitor {
                 }
             }
         } else if (unaryExp.isPrimaryExp()) {
-            visitPrimaryExp(unaryExp.getPrimaryExp());
-        } else {
-            visitUnaryExp(unaryExp.getUnaryExp());
+            return visitPrimaryExp(unaryExp.getPrimaryExp());
+        } else { //
+            if (unaryExp.getUnaryOp().equals("-")) {
+                Value value1 = new Constant("0");
+                Value value2 = visitUnaryExp(unaryExp.getUnaryExp());
+                return getBinInstr(value1, value2, Type.SUB);
+            } else if (unaryExp.getUnaryOp().equals("+")) {
+                return visitUnaryExp(unaryExp.getUnaryExp());
+            } else { // 取反操作就是与0比较是否相等
+                Value value1 = visitUnaryExp(unaryExp.getUnaryExp());
+                Value value2 = new Constant("0");
+                Compare compare = new Compare(Integer32Ty, SlotTracker.slot(), "!=");
+                compare.addOperands(value1);
+                compare.addOperands(value2);
+                curBasicBlock.appendInstr(compare);
+                return compare;
+            }
         }
+        return null;
     }
 
-    public void visitPrimaryExp(PrimaryExp primaryExp) {
+    public Value visitPrimaryExp(PrimaryExp primaryExp) {
         AstNode node = primaryExp.getPrimaryExp();
         if (node instanceof Exp) {
             visitAddExp(((Exp) node).getAddExp());
         } else if (node instanceof LVal) {
             visitLVal((LVal) node);
+        } else if (node instanceof Number) {
+            return new Constant(((Number) node).getNumber());
+        } else if (node instanceof Character) {
+            return new Constant(Integer8Ty, ((Character) node).getChar());
         }
+        return null;
     }
 
     public void visitLVal(LVal lVal) {

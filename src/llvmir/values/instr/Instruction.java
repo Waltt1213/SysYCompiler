@@ -5,12 +5,10 @@ import llvmir.User;
 import llvmir.values.BasicBlock;
 
 public class Instruction extends User {
-    private final BasicBlock parent;
     private final Type irType;
 
-    public Instruction(DataType vt, Type irType, BasicBlock basicBlock) {
-        super(vt);
-        this.parent = basicBlock;
+    public Instruction(DataType vt, Type irType, String name) {
+        super(vt, name);
         this.irType = irType;
     }
 
@@ -40,6 +38,27 @@ public class Instruction extends User {
             this.value = value;
         }
 
+        public static Type getOp(String op) {
+            switch (op) {
+                case "+":
+                    return ADD;
+                case "-":
+                    return SUB;
+                case "*":
+                    return MUL;
+                case "/":
+                    return SDIV;
+                case "%":
+                    return SREM;
+                case "&&":
+                    return AND;
+                case "||":
+                    return OR;
+                default:
+                    return DEFAULT;
+            }
+        }
+
         public String getValue() {
             return value;
         }
@@ -48,10 +67,6 @@ public class Instruction extends User {
         public String toString() {
             return value;
         }
-    }
-
-    public BasicBlock getParent() {
-        return parent;
     }
 
     public Type getIrType() {

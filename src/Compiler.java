@@ -1,6 +1,7 @@
 import frontend.Lexer;
 import frontend.Parser;
 import middle.Visitor;
+import utils.FileIO;
 
 import java.io.IOException;
 

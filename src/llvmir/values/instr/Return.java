@@ -2,16 +2,15 @@ package llvmir.values.instr;
 
 import llvmir.DataType;
 import llvmir.Value;
-import llvmir.values.BasicBlock;
 
 public class Return extends Instruction {
 
-    public Return(BasicBlock basicBlock) {
-        super(DataType.VoidTy, Type.RET, basicBlock);
+    public Return(String name) {
+        super(DataType.VoidTy, Type.RET, name);
     }
 
-    public Return(BasicBlock basicBlock, Value value) {
-        super(value.getTp(), Type.RET, basicBlock);
+    public Return(String name, Value value) {
+        super(value.getTp(), Type.RET, name);
         addOperands(value);
     }
 
@@ -20,7 +19,7 @@ public class Return extends Instruction {
         if (tp.equals(DataType.VoidTy)) {
             return "ret void";
         } else {
-            return "ret " + getOperands().get(0).toString();
+            return "ret " + getOperands().get(0).getDef();
         }
     }
 }

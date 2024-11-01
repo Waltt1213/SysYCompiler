@@ -17,6 +17,10 @@ public class Number implements AstNode {
         return intConst.getLineno();
     }
 
+    public String getNumber() {
+        return intConst.getContent();
+    }
+
     @Override
     public String getSymbol() {
         return "<Number>";

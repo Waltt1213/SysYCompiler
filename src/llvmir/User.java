@@ -7,8 +7,8 @@ import java.util.ArrayList;
 public class User extends Value {
     protected ArrayList<Value> operands; // 操作数
 
-    public User(DataType vt) {
-        super(vt, null);
+    public User(DataType vt, String name) {
+        super(vt, name);
         operands = new ArrayList<>();
     }
 

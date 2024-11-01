@@ -17,6 +17,10 @@ public class UnaryOp implements AstNode {
         return unaryOp.getLineno();
     }
 
+    public Token getOp() {
+        return unaryOp;
+    }
+
     @Override
     public String getSymbol() {
         return "<UnaryOp>";

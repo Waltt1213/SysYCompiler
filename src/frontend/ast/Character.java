@@ -1,6 +1,7 @@
 package frontend.ast;
 
 import frontend.Token;
+import utils.Transform;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -15,6 +16,11 @@ public class Character implements AstNode {
 
     public int getLineno() {
         return charConst.getLineno();
+    }
+
+    public String getChar() {
+        int ascii = Transform.str2int(charConst.getContent());
+        return String.valueOf(ascii);
     }
 
     @Override

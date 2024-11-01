@@ -50,12 +50,12 @@ PL/0编译器文件组织相对简单，主要包含以下几个部分：
 | sourceCode          | 以字符串形式存储的源代码                       |
 | lexer               | 词法分析器                                     |
 | parser              | 语法分析器                                     |
-| readTestFIle()      | 从特定路径中读取源代码.txt文件 (`FileIO.java`) |
+| readTestFIle()      | 从特定路径中读取源代码.txt文件 (`utils.FileIO.java`) |
 | analyzeCode()       | 词法分析阶段入口 (`Lexer.java`)                |
 | analyzeTokens()     | 语法分析阶段入口(`Parser.java`)                |
-| printLexerResult()  | 词法分析结果输出 (`FileIO.java`)               |
+| printLexerResult()  | 词法分析结果输出 (`utils.FileIO.java`)               |
 | printParserResult() | 语法分析结果输出(`FIleIO.java`)                |
-| printError()        | 错误结果输出 (`FileIO.java`)                   |
+| printError()        | 错误结果输出 (`utils.FileIO.java`)                   |
 
 ### 文件组织
 
@@ -66,7 +66,7 @@ SysYCompiler
 |-- parser.txt
 |-- src
 |   |-- Compiler.java
-|   |-- FileIO.java
+|   |-- utils.FileIO.java
 |   |-- config.json
 |   `-- frontend
 |       |-- Error.java

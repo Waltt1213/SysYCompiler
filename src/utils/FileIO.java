@@ -1,3 +1,5 @@
+package utils;
+
 import frontend.Error;
 import frontend.Token;
 import frontend.TokenType;
