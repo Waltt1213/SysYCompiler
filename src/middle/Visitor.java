@@ -9,10 +9,7 @@ import frontend.ast.Number;
 import llvmir.DataType;
 import llvmir.Module;
 import llvmir.Value;
-import llvmir.values.Argument;
-import llvmir.values.BasicBlock;
-import llvmir.values.Constant;
-import llvmir.values.Function;
+import llvmir.values.*;
 import llvmir.values.instr.*;
 
 import java.util.ArrayDeque;
@@ -114,21 +111,21 @@ public class Visitor {
 
     public void buildDeclare() {
         Function getint = new Function(Integer32Ty,"getint", module, false);
-        module.addFunction(getint);
+        module.addDeclare(getint);
 
         Function getChar = new Function(Integer32Ty,"getchar", module, false);
-        module.addFunction(getChar);
+        module.addDeclare(getChar);
 
         Function putint = new Function(VoidTy,"putint", module, false);
-        module.addFunction(putint);
+        module.addDeclare(putint);
         putint.addParams(new Argument(Integer32Ty, "param"));
 
         Function putch = new Function(VoidTy,"putch", module, false);
-        module.addFunction(putch);
+        module.addDeclare(putch);
         putch.addParams(new Argument(Integer32Ty, "param"));
 
         Function putstr = new Function(VoidTy,"putstr", module, false);
-        module.addFunction(putstr);
+        module.addDeclare(putstr);
         putstr.addParams(new Argument(Pointer8Ty, "param"));
     }
 
@@ -225,28 +222,61 @@ public class Visitor {
         String varName = constDef.getIdent().getContent();
         boolean isArray = constDef.hasArray();
         SymType st = new SymType(varType, isArray, true, false); //TODO
-        ConstInitVal civ = constDef.getConstInitVal();
         Symbol var = new Symbol(varName, st, curDepth, constDef.getIdent().getLineno());
+        // 加入符号表
         curTable.addSymItem(varName, var);
         symStack.push(var);
+        // 判断是否为数组
+        Value dim = new Constant(getDataType(varType),"0");
+        String valueType = varType;
         if (constDef.hasArray()) {
-            visitConstExp(constDef.getConstExp());
-        }
-        visitConstInitVal(constDef.getConstInitVal());
-    }
-
-    public void visitConstExp(ConstExp constExp) {
-        visitAddExp(constExp.getAddExp());
-    }
-
-    public void visitConstInitVal(ConstInitVal constInitVal) {
-        if (constInitVal.isConstExp()) {
-            visitConstExp(constInitVal.getConstExp());
-        } else if (constInitVal.isConstExps()) {
-            for (ConstExp constExp : constInitVal.getConstExps()) {
-                visitConstExp(constExp);
+            dim = visitConstExp(constDef.getConstExp());
+            if (dim instanceof Constant) {
+                valueType += "Array";
             }
         }
+        // 判断是否为全局变量
+        if (curTable.getFatherTable() == null) {
+            GlobalVariable value = new GlobalVariable(getDataType(valueType), varName);
+            module.addGlobalValue(value);
+            if (dim instanceof Constant) {
+                value.setDim((Constant) dim);
+            }
+            ArrayList<Value> constants = visitConstInitVal(constDef.getConstInitVal());
+            value.setInitVal(constants);
+        } else {
+            // 局部变量先alloca
+            Alloca alloca = new Alloca(getDataType(valueType), SlotTracker.slot());
+            curBasicBlock.appendInstr(alloca);
+            if (dim instanceof Constant) {
+                alloca.setDim((Constant) dim);
+            }
+            // 再store初值
+            ArrayList<Value> constants = visitConstInitVal(constDef.getConstInitVal());
+            buildLocalInit(alloca, constants);
+        }
+    }
+
+    public void buildLocalInit(Alloca alloca, ArrayList<Value> constants) {
+        if (constants.size() == 1) {
+            
+        }
+    }
+
+    public Value visitConstExp(ConstExp constExp) {
+        return visitAddExp(constExp.getAddExp());
+    }
+
+    public ArrayList<Value> visitConstInitVal(ConstInitVal constInitVal) {
+        ArrayList<Value> constants = new ArrayList<>();
+        if (constInitVal.isConstExp()) {
+            constants.add(visitConstExp(constInitVal.getConstExp()));
+        } else if (constInitVal.isConstExps()) {
+            for (ConstExp constExp : constInitVal.getConstExps()) {
+                constants.add(visitConstExp(constExp));
+            }
+        }
+        return constants;
     }
 
     public void visitVarDecl(VarDecl vd) {
@@ -263,32 +293,49 @@ public class Visitor {
     public void visitVarDef(String varType, VarDef varDef) throws Error {
         String varName = varDef.getIdent().getContent();
         boolean isArray = varDef.hasConstExp();
-        SymType st;
-        if (isArray) {
-            st = new SymType(varType, true,false, false); // TODO
-        } else {
-            st = new SymType(varType, false, false, false);
-        }
+        SymType st = new SymType(varType, isArray,false, false); // TODO;
         InitVal iv = varDef.getInitVal();
         Symbol var = new Symbol(varName, st, curDepth, varDef.getIdent().getLineno());
         curTable.addSymItem(varName, var);
         symStack.push(var);
+        // 判断是否为数组
+        Value dim = new Constant(getDataType(varType),"0");
+        String valueType = varType;
         if (varDef.hasConstExp()) {
-            visitConstExp(varDef.getConstExp());
-        }
-        if (varDef.hasInitVal()) {
-            visitInitVal(varDef.getInitVal());
-        }
-    }
-
-    public void visitInitVal(InitVal initVal) {
-        if (initVal.isExp()) {
-            visitAddExp(initVal.getExp().getAddExp());
-        } else if (initVal.isExps()) {
-            for (Exp exp: initVal.getExps()) {
-                visitAddExp(exp.getAddExp());
+            dim = visitConstExp(varDef.getConstExp());
+            if (dim instanceof Constant) {
+                valueType += "Array";
             }
         }
+        if (curTable.getFatherTable() == null) {
+            GlobalVariable globalVariable = new GlobalVariable(getDataType(valueType), varName);
+            if (dim instanceof Constant) {
+                globalVariable.setDim((Constant) dim);
+            }
+            module.addGlobalValue(globalVariable);
+            if (varDef.hasInitVal()) {
+                globalVariable.setInitVal(visitInitVal(varDef.getInitVal()));
+            }
+        }
+
+    }
+
+    public ArrayList<Value> visitInitVal(InitVal initVal) {
+        ArrayList<Value> inits = new ArrayList<>();
+        if (initVal.isExp()) {
+            inits.add(visitAddExp(initVal.getExp().getAddExp()));
+        } else if (initVal.isExps()) {
+            for (Exp exp: initVal.getExps()) {
+                inits.add(visitAddExp(exp.getAddExp()));
+            }
+        } else {
+            inits.add(visitStringConst(initVal.getStringConst()));
+        }
+        return inits;
+    }
+
+    public Constant visitStringConst(Token string) {
+        return new Constant(Pointer8Ty, string.getContent());
     }
 
     public void visitFuncFParams(FuncFParams fps) throws Error {
@@ -448,7 +495,7 @@ public class Visitor {
 
     public Value zext(Value value) {
         if (value.getTp() != Integer32Ty) {
-            Zext zext = new Zext(Integer32Ty, Instruction.Type.ZEXT, SlotTracker.slot());
+            Zext zext = new Zext(value.getTp(), Instruction.Type.ZEXT, SlotTracker.slot());
             zext.addOperands(value);
             curBasicBlock.appendInstr(zext);
             return zext;
@@ -591,6 +638,10 @@ public class Visitor {
             return Integer32Ty;
         } else if (type.equals("Char")) {
             return Integer8Ty;
+        } else if (type.equals("IntArray")) {
+            return Pointer32Ty;
+        } else if (type.equals("CharArray")) {
+            return Pointer8Ty;
         } else {
             return VoidTy;
         }

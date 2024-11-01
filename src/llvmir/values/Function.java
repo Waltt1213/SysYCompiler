@@ -22,6 +22,7 @@ public class Function extends Value {
         funcFParams = new ArrayList<>();
         this.isDefine = isDefine;
         isReturn = false;
+        id = globalId;
     }
 
     public int getArgc() {
@@ -45,6 +46,11 @@ public class Function extends Value {
     }
 
     @Override
+    public String getFullName() {
+        return super.getFullName();
+    }
+
+    @Override
     public String getName() {
         return "@" + super.getName();
     }
@@ -59,7 +65,7 @@ public class Function extends Value {
         StringBuilder sb = new StringBuilder();
         if (isDefine) {
             sb.append("define dso_local ").append(tp.toString()).append(" ");
-            sb.append("@").append(name).append("(");
+            sb.append(getFullName()).append("(");
             for (int i = 0; i < funcFParams.size(); i++) {
                 sb.append(funcFParams.get(i).toString());
                 if (i < funcFParams.size() - 1) {
@@ -73,7 +79,7 @@ public class Function extends Value {
             sb.append("}\n");
         } else {
             sb.append("declare ").append(tp.toString()).append(" ");
-            sb.append("@").append(name).append("(");
+            sb.append(getFullName()).append("(");
             for (int i = 0; i < funcFParams.size(); i++) {
                 sb.append(funcFParams.get(i).getTp().toString());
                 if (i < funcFParams.size() - 1) {

@@ -46,8 +46,8 @@ public class InitVal implements AstNode {
         return exps != null;
     }
 
-    public boolean isStringConst() {
-        return stringConst != null;
+    public Token getStringConst() {
+        return stringConst;
     }
 
     @Override

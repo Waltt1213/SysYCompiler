@@ -8,7 +8,8 @@ public enum DataType {
     // Derived types
     Integer8Ty("i8"),    //8位整数类型
     Integer32Ty("i32"),    //32位整数类型
-    Pointer8Ty("i8*");     //指针类型
+    Pointer32Ty("i32*"),    //指针类型
+    Pointer8Ty("i8*");
 
     private final String value;
 

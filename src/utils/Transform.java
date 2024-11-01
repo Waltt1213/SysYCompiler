@@ -19,8 +19,8 @@ public class Transform {
     }};
 
     public static int str2int(String str) {
-        if (str.length() == 1) {
-            return str.charAt(0);
+        if (str.substring(1, str.length() - 1).length() == 1) {
+            return str.substring(1, str.length() - 1).charAt(0);
         } else {
             if (asciiMap.containsKey(str.substring(1, str.length() - 1))) {
                 return asciiMap.get(str.substring(1, str.length() - 1));
