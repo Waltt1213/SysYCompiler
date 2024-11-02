@@ -66,6 +66,10 @@ public class Stmt implements AstNode {
         return stringConst != null;
     }
 
+    public String getStringConst() {
+        return stringConst.getContent();
+    }
+
     @Override
     public String getSymbol() {
         return "<Stmt>";

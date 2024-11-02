@@ -32,8 +32,17 @@ public class SymbolTable {
         return children;
     }
 
-    public boolean findSym(String name) {
-        return symItems.containsKey(name);
+    public Symbol findSym(String name, String type) {
+        if (symItems.containsKey(name)) {
+            Symbol symbol = symItems.get(name);
+            if (symbol.getName().equals(name) && symbol.getVarOrFunc().equals(type)) {
+                return symbol;
+            }
+        }
+        if (fatherTable != null) {
+            return fatherTable.findSym(name, type);
+        }
+        return null;
     }
 
     public Symbol getSym(String name) {

@@ -1,9 +1,9 @@
 package llvmir.values.instr;
 
-import llvmir.DataType;
+import llvmir.ValueType;
 
 public class Phi extends Instruction {
-    public Phi(DataType vt, String name) {
+    public Phi(ValueType.Type vt, String name) {
         super(vt, Type.PHI, name);
     }
 }

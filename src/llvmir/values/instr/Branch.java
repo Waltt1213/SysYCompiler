@@ -1,10 +1,10 @@
 package llvmir.values.instr;
 
-import llvmir.DataType;
+import llvmir.ValueType;
 
 public class Branch extends Instruction {
 
-    public Branch(DataType vt, String name) {
+    public Branch(ValueType.Type vt, String name) {
         super(vt, Type.BR, name);
     }
 }

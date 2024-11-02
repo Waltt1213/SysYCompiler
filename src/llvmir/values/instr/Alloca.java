@@ -1,33 +1,20 @@
 package llvmir.values.instr;
 
-import llvmir.DataType;
-import llvmir.values.Constant;
+import llvmir.ValueType;
 
 public class Alloca extends Instruction {
-    private Constant dim;
-
-    public Alloca(DataType vt, String name) {
+    // 传递进来的vt是ArrayType
+    public Alloca(ValueType.Type vt, String name) {
         super(vt, Type.ALLOCA, name);
     }
 
-    public void setDim(Constant dim) {
-        this.dim = dim;
-    }
-
-    public Constant getDim() {
-        return dim;
-    }
-
-    public String allocType() {
-        if (tp == DataType.Pointer8Ty || tp == DataType.Pointer32Ty) {
-            return "[" + dim.getName() + " x " +
-                    tp.toString().substring(0, tp.toString().length() - 1) + "]";
-        }
-        return tp.toString();
+    @Override
+    public ValueType.Type getTp() {
+        return new ValueType.PointerType(tp);
     }
 
     @Override
     public String toString() {
-        return getFullName() + " = alloca " + allocType();
+        return getFullName() + " = alloca " + tp.getActType().toString();
     }
 }

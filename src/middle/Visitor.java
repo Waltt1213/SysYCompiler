@@ -6,17 +6,18 @@ import frontend.TokenType;
 import frontend.ast.*;
 import frontend.ast.Character;
 import frontend.ast.Number;
-import llvmir.DataType;
 import llvmir.Module;
 import llvmir.Value;
+import llvmir.ValueType;
 import llvmir.values.*;
 import llvmir.values.instr.*;
+import utils.Transform;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import static llvmir.DataType.*;
+import static llvmir.ValueType.DataType.*;
 import static llvmir.values.instr.Instruction.*;
 
 public class Visitor {
@@ -24,7 +25,7 @@ public class Visitor {
     private final ArrayList<SymbolTable> symbolTables;    //  符号表集
     private final ArrayDeque<SymbolTable> tableStack;     // 符号表栈
     private final ArrayDeque<Symbol> symStack;            // 符号栈
-    private final Module module = new Module(VoidTy, "global");
+    private final Module module = new Module(new ValueType.Type(VoidTy), "global");
     private final HashMap<String, Symbol> funcNameTable;
     private final ArrayDeque<BlockType> blockStack;
     private SymbolTable curTable;
@@ -110,23 +111,26 @@ public class Visitor {
     }
 
     public void buildDeclare() {
-        Function getint = new Function(Integer32Ty,"getint", module, false);
+        Function getint = new Function(new ValueType.Type(Integer32Ty),"getint", module, false);
         module.addDeclare(getint);
 
-        Function getChar = new Function(Integer32Ty,"getchar", module, false);
+        Function getChar = new Function(new ValueType.Type(Integer32Ty),"getchar", module, false);
         module.addDeclare(getChar);
 
-        Function putint = new Function(VoidTy,"putint", module, false);
+        Function putint = new Function(new ValueType.Type(VoidTy),"putint", module, false);
         module.addDeclare(putint);
-        putint.addParams(new Argument(Integer32Ty, "param"));
+        putint.addParams(new Argument(new ValueType.Type(Integer32Ty), "param"));
 
-        Function putch = new Function(VoidTy,"putch", module, false);
+        Function putch = new Function(new ValueType.Type(VoidTy),"putch", module, false);
         module.addDeclare(putch);
-        putch.addParams(new Argument(Integer32Ty, "param"));
+        putch.addParams(new Argument(new ValueType.Type(Integer32Ty), "param"));
 
-        Function putstr = new Function(VoidTy,"putstr", module, false);
+        Function putstr = new Function(new ValueType.Type(VoidTy),"putstr", module, false);
         module.addDeclare(putstr);
-        putstr.addParams(new Argument(Pointer8Ty, "param"));
+        putstr.addParams(new Argument(new ValueType.PointerType(Integer8Ty), "param"));
+
+        // 加入符号表
+
     }
 
     public void visitFuncDef(FuncDef fd) {
@@ -147,32 +151,32 @@ public class Visitor {
             curTable.addSymItem(funcName, funcSym);
             funcNameTable.put(funcName, funcSym);
             // 创建一个基本块
-            curBasicBlock = new BasicBlock(LabelTy, "");
+            curBasicBlock = new BasicBlock(new ValueType.Type(LabelTy), "");
             function.addBasicBlock(curBasicBlock);
         } catch (Error e) {
             errors.add(new Error("b", fd.getFuncType().getType().getLineno()));
         }
         // 形参需要加入符号表，但属于下一层级
         blockStack.push(BlockType.FuncBlock);
-        visitBlock(fd.getBlock(), fd.getFuncFParams());  // 构建函数内符号表
-        if (!ft.toString().equals("VoidFunc") && !fd.getBlock().hasRet()) {
-            errors.add(new Error("g", fd.getBlock().getLineno()));
-        }
-    }
-
-    public void visitBlock(Block block, FuncFParams fps) {
         curDepth++;
         SymbolTable st = new SymbolTable(curTable, curDepth);
         curTable.addChildren(st);   // 新表设为当前表的孩子
         curTable = st;
         symbolTables.add(curTable); // 将符号表加入符号表集
         tableStack.push(curTable); // 入栈
-        if (fps != null) {
+        if (fd.getFuncFParams() != null) {
             try {
-                visitFuncFParams(fps);  // 函数形参与函数块内符号属于同一层级
+                visitFuncFParams(fd.getFuncFParams());  // 函数形参与函数块内符号属于同一层级
             } catch (Error e) { errors.add(e); }
         }
         curBasicBlock.setName(SlotTracker.slot()); // 基本块占一个%
+        visitBlock(fd.getBlock());  // 构建函数内符号表
+        if (!ft.toString().equals("VoidFunc") && !fd.getBlock().hasRet()) {
+            errors.add(new Error("g", fd.getBlock().getLineno()));
+        }
+    }
+
+    public void visitBlock(Block block) {
         for (AstNode blockItem: block.getBlockItems()) {
             if (blockItem instanceof ConstDecl) {
                 visitConstDecl((ConstDecl) blockItem);
@@ -203,19 +207,26 @@ public class Visitor {
         // 归零
         SlotTracker.reset();
         // 创建main函数
-        Function main = new Function(Integer32Ty, "main", module, true);
+        Function main = new Function(new ValueType.Type(Integer32Ty), "main", module, true);
         curFunction = main;
         // 加入module
         module.addFunction(main);
         // 添加一个基本块
-        curBasicBlock = new BasicBlock(LabelTy, SlotTracker.slot());
+        curBasicBlock = new BasicBlock(new ValueType.Type(LabelTy), "");
         main.addBasicBlock(curBasicBlock);
         if (!astNode.getBlock().hasRet()) {
             errors.add(new Error("g", (astNode).getBlock().getLineno()));
         }
         blockStack.push(BlockType.FuncBlock);
-
-        visitBlock(astNode.getBlock(), null);
+        // 进入下一层
+        curDepth++;
+        SymbolTable st = new SymbolTable(curTable, curDepth);
+        curTable.addChildren(st);   // 新表设为当前表的孩子
+        curTable = st;
+        symbolTables.add(curTable); // 将符号表加入符号表集
+        tableStack.push(curTable); // 入栈
+        curBasicBlock.setName(SlotTracker.slot()); // 基本块占一个%
+        visitBlock(astNode.getBlock());
     }
 
     public void visitConstDef(String varType, ConstDef constDef) throws Error {
@@ -227,39 +238,79 @@ public class Visitor {
         curTable.addSymItem(varName, var);
         symStack.push(var);
         // 判断是否为数组
-        Value dim = new Constant(getDataType(varType),"0");
-        String valueType = varType;
+        ValueType.Type type = getDataType(varType);
         if (constDef.hasArray()) {
-            dim = visitConstExp(constDef.getConstExp());
+            Value dim = visitConstExp(constDef.getConstExp());
             if (dim instanceof Constant) {
-                valueType += "Array";
+                type = getDataType(varType + "Array");
+                ((ValueType.ArrayType) type).setDim(Integer.parseInt(dim.getName()));
             }
         }
         // 判断是否为全局变量
-        if (curTable.getFatherTable() == null) {
-            GlobalVariable value = new GlobalVariable(getDataType(valueType), varName);
+        if (curTable.getFatherTable() == null) { // 全局变量
+            GlobalVariable value = new GlobalVariable(type, varName);
             module.addGlobalValue(value);
-            if (dim instanceof Constant) {
-                value.setDim((Constant) dim);
-            }
             ArrayList<Value> constants = visitConstInitVal(constDef.getConstInitVal());
             value.setInitVal(constants);
+            var.setValue(value);
         } else {
             // 局部变量先alloca
-            Alloca alloca = new Alloca(getDataType(valueType), SlotTracker.slot());
+            Alloca alloca = new Alloca(type, SlotTracker.slot());
             curBasicBlock.appendInstr(alloca);
-            if (dim instanceof Constant) {
-                alloca.setDim((Constant) dim);
-            }
             // 再store初值
             ArrayList<Value> constants = visitConstInitVal(constDef.getConstInitVal());
             buildLocalInit(alloca, constants);
+            var.setValue(alloca);
         }
     }
 
     public void buildLocalInit(Alloca alloca, ArrayList<Value> constants) {
         if (constants.size() == 1) {
-            
+            if (alloca.getTp().getDataType() == Integer8Ty) {
+                String s = constants.get(0).getName();
+                s = s.substring(1, s.length() - 1); // 删去“”
+                ArrayList<Integer> str2int = Transform.str2intList(s);
+                Value prePtr = alloca;
+                for (int i = 0;  i < str2int.size(); i++) {
+                    GetElementPtr getElementPtr = new GetElementPtr(prePtr.getTp(), SlotTracker.slot());
+                    getElementPtr.addOperands(prePtr);
+                    if (i == 0) {
+                        getElementPtr.addOperands(new Constant("0"));
+                        getElementPtr.addOperands(new Constant("0"));
+                    } else {
+                        getElementPtr.addOperands(new Constant("1"));
+                    }
+                    curBasicBlock.appendInstr(getElementPtr);
+                    Store store = new Store(new ValueType.Type(VoidTy), "");
+                    store.addOperands(new Constant(String.valueOf(str2int.get(i))));
+                    store.addOperands(getElementPtr);
+                    curBasicBlock.appendInstr(store);
+                    prePtr = getElementPtr;
+                }
+            } else {
+                Store store = new Store(new ValueType.Type(VoidTy), "");
+                store.addOperands(constants.get(0));
+                store.addOperands(alloca);
+                curBasicBlock.appendInstr(store);
+            }
+        } else {
+            Value prePtr = alloca;
+            for (int i = 0;  i < constants.size(); i++) {
+                GetElementPtr getElementPtr = new GetElementPtr(prePtr.getTp(), SlotTracker.slot());
+                getElementPtr.addOperands(prePtr);
+                if (i == 0) {
+                    getElementPtr.addOperands(new Constant("0"));
+                    getElementPtr.addOperands(new Constant("0"));
+                } else {
+                    getElementPtr.addOperands(new Constant("1"));
+                }
+                curBasicBlock.appendInstr(getElementPtr);
+                Store store = new Store(new ValueType.Type(VoidTy), "");
+                store.addOperands(constants.get(i));
+                store.addOperands(getElementPtr);
+                curBasicBlock.appendInstr(store);
+                prePtr = getElementPtr;
+            }
         }
     }
 
@@ -275,6 +326,8 @@ public class Visitor {
             for (ConstExp constExp : constInitVal.getConstExps()) {
                 constants.add(visitConstExp(constExp));
             }
+        } else {
+            constants.add(visitStringConst(constInitVal.getStringConst()));
         }
         return constants;
     }
@@ -294,28 +347,35 @@ public class Visitor {
         String varName = varDef.getIdent().getContent();
         boolean isArray = varDef.hasConstExp();
         SymType st = new SymType(varType, isArray,false, false); // TODO;
-        InitVal iv = varDef.getInitVal();
         Symbol var = new Symbol(varName, st, curDepth, varDef.getIdent().getLineno());
         curTable.addSymItem(varName, var);
         symStack.push(var);
         // 判断是否为数组
-        Value dim = new Constant(getDataType(varType),"0");
-        String valueType = varType;
+        ValueType.Type type = getDataType(varType);
         if (varDef.hasConstExp()) {
-            dim = visitConstExp(varDef.getConstExp());
+            Value dim = visitConstExp(varDef.getConstExp());
             if (dim instanceof Constant) {
-                valueType += "Array";
+                type = getDataType(varType + "Array");
+                ((ValueType.ArrayType) type).setDim(Integer.parseInt(dim.getName()));
             }
         }
         if (curTable.getFatherTable() == null) {
-            GlobalVariable globalVariable = new GlobalVariable(getDataType(valueType), varName);
-            if (dim instanceof Constant) {
-                globalVariable.setDim((Constant) dim);
-            }
+            GlobalVariable globalVariable = new GlobalVariable(type, varName);
             module.addGlobalValue(globalVariable);
             if (varDef.hasInitVal()) {
                 globalVariable.setInitVal(visitInitVal(varDef.getInitVal()));
             }
+            var.setValue(globalVariable);
+        } else {
+            // 局部变量先alloca
+            Alloca alloca = new Alloca(type, SlotTracker.slot());
+            curBasicBlock.appendInstr(alloca);
+            // 再store初值
+            if (varDef.hasInitVal()) {
+                ArrayList<Value> constants = visitInitVal(varDef.getInitVal());
+                buildLocalInit(alloca, constants);
+            }
+            var.setValue(alloca);
         }
 
     }
@@ -335,7 +395,7 @@ public class Visitor {
     }
 
     public Constant visitStringConst(Token string) {
-        return new Constant(Pointer8Ty, string.getContent());
+        return new Constant(new ValueType.ArrayType(Integer8Ty), string.getContent());
     }
 
     public void visitFuncFParams(FuncFParams fps) throws Error {
@@ -343,12 +403,16 @@ public class Visitor {
             FuncFParam fp = (FuncFParam) node;
             String funcVarName = fp.getIdentName();
             String funcVarType = getType(fp.getType());
+            if (fp.isArray()) {
+                funcVarType += "Pointer";
+            }
             // 创建参数并加入函数
             Argument argument = new Argument(getDataType(funcVarType), SlotTracker.slot());
             curFunction.addParams(argument);
             // 加入符号表
             SymType st = new SymType(funcVarType, fp.isArray(), false, false);
             Symbol symbol = new Symbol(funcVarName, st, curDepth, fp.getIdent().getLineno());
+            symbol.setValue(argument);
             curTable.addSymItem(funcVarName, symbol);
             symStack.push(symbol);
         }
@@ -382,29 +446,53 @@ public class Visitor {
                 errors.add(new Error("m", stmt.getLineno()));
             }
         } else if (stmt.getType() == Stmt.StmtType.PRINTF) {
-            if (stmt.FormatNum() != stmt.getStmts().size()) {
-                errors.add(new Error("l", stmt.getLineno()));
-            }
-            for (AstNode exp: stmt.getStmts()) {
-                visitAddExp(((Exp) exp).getAddExp());
-            }
+            visitPrintf(stmt);
         } else if (stmt.getType() == Stmt.StmtType.EXP) {
             visitAddExp(((Exp) stmt.getStmts().get(0)).getAddExp());
         } else if (stmt.getType() == Stmt.StmtType.BLOCK) {
-            visitBlock((Block) stmt.getStmts().get(0), null);
+            curDepth++;
+            SymbolTable st = new SymbolTable(curTable, curDepth);
+            curTable.addChildren(st);   // 新表设为当前表的孩子
+            curTable = st;
+            symbolTables.add(curTable); // 将符号表加入符号表集
+            tableStack.push(curTable); // 入栈
+            visitBlock((Block) stmt.getStmts().get(0));
         } else if (!stmt.getStmts().isEmpty() && stmt.getStmts().get(0) instanceof LVal) {
             String name = ((LVal) stmt.getStmts().get(0)).getIdentName();
-            if (findSymInStack(name, "Var")) {
-                Symbol sym = getSymInStack(name, "Var");
+            Symbol sym;
+            if ((sym = curTable.findSym(name, "Var")) != null) {
                 if (sym.getType().isConst()) {
                     if (stmt.iaNormalAssign()) {
                         errors.add(new Error("h", stmt.getLineno()));
                     }
                 }
             }
-            visitLVal((LVal) stmt.getStmts().get(0));
+            Value value = visitLVal((LVal) stmt.getStmts().get(0), false);
             if (stmt.getType() == Stmt.StmtType.ASSIGN) {
-                visitAddExp(((Exp) stmt.getStmts().get(1)).getAddExp());
+                Value res = visitAddExp(((Exp) stmt.getStmts().get(1)).getAddExp());
+                Store store = new Store(new ValueType.Type(VoidTy), "");
+                store.addOperands(res);
+                store.addOperands(value);
+                curBasicBlock.appendInstr(store);
+            } else if (stmt.getType() == Stmt.StmtType.GETINT) {
+                Function getint = module.getDeclare("getint");
+                Call call = new Call(SlotTracker.slot(), getint);
+                curBasicBlock.appendInstr(call);
+                Store store = new Store(new ValueType.Type(VoidTy), "");
+                store.addOperands(call);
+                store.addOperands(value);
+                curBasicBlock.appendInstr(store);
+            } else if (stmt.getType() == Stmt.StmtType.GETCHAR) {
+                Function getint = module.getDeclare("getchar");
+                Call call = new Call(SlotTracker.slot(), getint);
+                curBasicBlock.appendInstr(call);
+                Trunc trunc = new Trunc(new ValueType.Type(Integer8Ty), SlotTracker.slot());
+                trunc.addOperands(call);
+                curBasicBlock.appendInstr(trunc);
+                Store store = new Store(new ValueType.Type(VoidTy), "");
+                store.addOperands(trunc);
+                store.addOperands(value);
+                curBasicBlock.appendInstr(store);
             }
         }
     }
@@ -415,21 +503,96 @@ public class Visitor {
         }
         if (!stmt.getStmts().isEmpty()) {
             Value ret = visitAddExp(((Exp) stmt.getStmts().get(0)).getAddExp());
+            curFunction.setReturn(true);
             curBasicBlock.appendInstr(new Return(null, ret));
         } else {
             curBasicBlock.appendInstr(new Return(null));
         }
     }
 
+    public void visitPrintf(Stmt stmt) {
+        if (stmt.FormatNum() != stmt.getStmts().size()) {
+            errors.add(new Error("l", stmt.getLineno()));
+            return;
+        }
+        ArrayList<Value> puts = new ArrayList<>();
+        for (AstNode exp: stmt.getStmts()) {
+            puts.add(visitAddExp(((Exp) exp).getAddExp()));
+        }
+        int index = 0;
+        String strConst = stmt.getStringConst();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 1; i < strConst.length() - 1; i++) {
+            char c = strConst.charAt(i);
+            if (c == '%' && (strConst.charAt(i + 1) == 'd' || strConst.charAt(i + 1) == 'c')) {
+                String globalStr = "\"" + sb + "\"";
+                sb.setLength(0);
+                if (globalStr.length() > 2) {
+                    ValueType.ArrayType arrayType = new ValueType.ArrayType(Integer8Ty);
+                    arrayType.setDim(Transform.charList2string(globalStr).length() + 1);
+                    System.out.println(globalStr);
+                    GlobalVariable var = new GlobalVariable(arrayType, SlotTracker.slotStr());
+                    var.setUnnamed(true);
+                    var.addInitVal(new Constant(new ValueType.ArrayType(Integer8Ty), globalStr));
+                    module.addGlobalValue(var);
+                    buildPrintf(var, 's'); // 打印字符串
+                }
+                i++;
+                buildPrintf(puts.get(index), strConst.charAt(i));
+                index++;
+            } else {
+                sb.append(c);
+            }
+        }
+        String globalStr = "\"" + sb + "\"";
+        sb.setLength(0);
+        if (globalStr.length() > 2) {
+            ValueType.ArrayType arrayType = new ValueType.ArrayType(Integer8Ty);
+            arrayType.setDim(Transform.charList2string(globalStr).length() + 1);
+            System.out.println(globalStr);
+            GlobalVariable var = new GlobalVariable(arrayType, SlotTracker.slotStr());
+            var.setUnnamed(true);
+            var.addInitVal(new Constant(new ValueType.ArrayType(Integer8Ty), globalStr));
+            module.addGlobalValue(var);
+            buildPrintf(var, 's'); // 打印字符串
+        }
+    }
+
+    public void buildPrintf(Value var, java.lang.Character c) {
+        if (c == 's') {
+            Function putstr = module.getDeclare("putstr");
+            Call call = new Call(putstr);
+            curBasicBlock.appendInstr(call);
+            GetElementPtr getElementPtr = new GetElementPtr(var.getTp(), null);
+            getElementPtr.addOperands(var);
+            getElementPtr.addOperands(new Constant(new ValueType.Type(Integer64Ty), "0"));
+            getElementPtr.addOperands(new Constant(new ValueType.Type(Integer64Ty), "0"));
+            call.addFuncRParam(getElementPtr);
+        } else if (c == 'c') {
+            Function putch = module.getDeclare("putch");
+            Call call = new Call(putch);
+            Value newVar = zext(var);
+            call.addFuncRParam(newVar);
+            curBasicBlock.appendInstr(call);
+        } else {
+            Function putint = module.getDeclare("putint");
+            Call call = new Call(putint);
+            Value newVar = zext(var);
+            call.addFuncRParam(newVar);
+            curBasicBlock.appendInstr(call);
+        }
+    }
+
     public void visitForStmt(ForStmt forStmt) {
         String name = forStmt.getLval().getIdentName();
-        if (findSymInStack(name, "Var")) {
-            Symbol sym = getSymInStack(name, "Var");
+        Symbol sym;
+        if ((sym = curTable.findSym(name, "Var")) != null) {
+            //Symbol sym = getSymInStack(name, "Var");
             if (sym.getType().isConst()) {
                 errors.add(new Error("h", forStmt.getLineno()));
             }
         }
-        visitLVal(forStmt.getLval());
+        visitLVal(forStmt.getLval(), false);
         visitAddExp(forStmt.getExp().getAddExp());
     }
 
@@ -458,12 +621,15 @@ public class Visitor {
     }
 
     public Value getBinInstr(Value value1, Value value2, Type type) {
+        if (value1 == null || value2 == null) {
+            return null;
+        }
         if (value1 instanceof Constant && value2 instanceof Constant) {
             return calConst((Constant) value1, (Constant) value2, type);
         } else {
             Value zextValue1 = zext(value1);
             Value zextValue2 = zext(value2);
-            BinaryOperator binOp = new BinaryOperator(Integer32Ty, type, SlotTracker.slot());
+            BinaryOperator binOp = new BinaryOperator(new ValueType.Type(Integer32Ty), type, SlotTracker.slot());
             binOp.addOperands(zextValue1);
             binOp.addOperands(zextValue2);
             curBasicBlock.appendInstr(binOp);
@@ -474,28 +640,28 @@ public class Visitor {
     public Constant calConst(Constant value1, Constant value2, Type type) {
         switch (type) {
             case ADD:
-                return new Constant(Integer.toString(Integer.parseInt(value1.toString())
-                        + Integer.parseInt(value2.toString())));
+                return new Constant(Integer.toString(Integer.parseInt(value1.getName())
+                        + Integer.parseInt(value2.getName())));
             case SUB:
-                return new Constant(Integer.toString(Integer.parseInt(value1.toString())
-                        - Integer.parseInt(value2.toString())));
+                return new Constant(Integer.toString(Integer.parseInt(value1.getName())
+                        - Integer.parseInt(value2.getName())));
             case MUL:
-                return new Constant(Integer.toString(Integer.parseInt(value1.toString())
-                        * Integer.parseInt(value2.toString())));
+                return new Constant(Integer.toString(Integer.parseInt(value1.getName())
+                        * Integer.parseInt(value2.getName())));
             case SDIV:
-                return new Constant(Integer.toString(Integer.parseInt(value1.toString())
-                        / Integer.parseInt(value2.toString())));
+                return new Constant(Integer.toString(Integer.parseInt(value1.getName())
+                        / Integer.parseInt(value2.getName())));
             case SREM:
-                return new Constant(Integer.toString(Integer.parseInt(value1.toString())
-                        % Integer.parseInt(value2.toString())));
+                return new Constant(Integer.toString(Integer.parseInt(value1.getName())
+                        % Integer.parseInt(value2.getName())));
             default:
                 return null;
         }
     }
 
     public Value zext(Value value) {
-        if (value.getTp() != Integer32Ty) {
-            Zext zext = new Zext(value.getTp(), Instruction.Type.ZEXT, SlotTracker.slot());
+        if (value.getTp().getDataType() != Integer32Ty) {
+            Zext zext = new Zext(new ValueType.Type(Integer32Ty), SlotTracker.slot());
             zext.addOperands(value);
             curBasicBlock.appendInstr(zext);
             return zext;
@@ -534,17 +700,26 @@ public class Visitor {
     public Value visitUnaryExp(UnaryExp unaryExp) {
         if (unaryExp.isIdent()) {
             String name = unaryExp.getIdentName();
-            if (!findSymInStack(name, "Func")) {
+            Symbol symbol;
+            if ((symbol = curTable.findSym(name, "Func")) == null) {
                 errors.add(new Error("c", unaryExp.getIdent().getLineno()));
+                return null;
             }
+            Function callFunc = (Function) symbol.getValue();
+            Call call = new Call(callFunc);
             if (unaryExp.hasFuncRParams() && funcNameTable.containsKey(name)) {
                 Symbol func = funcNameTable.get(name);
                 if (func != null && unaryExp.getArgc() != ((Function) func.getValue()).getArgc()) {
                     errors.add(new Error("d", unaryExp.getLineno()));
                 } else if (func != null) {
-                    visitFuncRParams(func.getFuncFParams(), unaryExp.getFuncRParams());
+                    call.setFuncRParams(visitFuncRParams(func.getFuncFParams(), unaryExp.getFuncRParams()));
+                    if (callFunc.isReturn()) {
+                        call.setName(SlotTracker.slot());
+                    }
                 }
             }
+            curBasicBlock.appendInstr(call);
+            return call;
         } else if (unaryExp.isPrimaryExp()) {
             return visitPrimaryExp(unaryExp.getPrimaryExp());
         } else { //
@@ -557,43 +732,75 @@ public class Visitor {
             } else { // 取反操作就是与0比较是否相等
                 Value value1 = visitUnaryExp(unaryExp.getUnaryExp());
                 Value value2 = new Constant("0");
-                Compare compare = new Compare(Integer32Ty, SlotTracker.slot(), "!=");
+                Compare compare = new Compare(new ValueType.Type(Integer32Ty), SlotTracker.slot(), "!=");
                 compare.addOperands(value1);
                 compare.addOperands(value2);
                 curBasicBlock.appendInstr(compare);
                 return compare;
             }
         }
-        return null;
     }
 
     public Value visitPrimaryExp(PrimaryExp primaryExp) {
         AstNode node = primaryExp.getPrimaryExp();
         if (node instanceof Exp) {
-            visitAddExp(((Exp) node).getAddExp());
+            return visitAddExp(((Exp) node).getAddExp());
         } else if (node instanceof LVal) {
-            visitLVal((LVal) node);
+            return visitLVal((LVal) node, true);
         } else if (node instanceof Number) {
             return new Constant(((Number) node).getNumber());
         } else if (node instanceof Character) {
-            return new Constant(Integer8Ty, ((Character) node).getChar());
+            return new Constant(new ValueType.Type(Integer8Ty), ((Character) node).getChar());
         }
         return null;
     }
 
-    public void visitLVal(LVal lVal) {
+    public Value visitLVal(LVal lVal, boolean isOperand) {
         String name = lVal.getIdentName();
-        if (!findSymInStack(name, "Var")) {
+        Symbol symbol;
+        if ((symbol = curTable.findSym(name, "Var")) == null) {
             errors.add(new Error("c", lVal.getIdent().getLineno()));
+            return null;
         }
+        Value value = symbol.getValue();
         if (lVal.isArray()) {
-            visitAddExp(lVal.getExp().getAddExp());
+            Value index = visitAddExp(lVal.getExp().getAddExp());
+            String bis = index.getName();
+            GetElementPtr getElementPtr = new GetElementPtr(value.getTp(), SlotTracker.slot());
+            getElementPtr.addOperands(value);
+            getElementPtr.addOperands(new Constant("0"));
+            getElementPtr.addOperands(new Constant(bis));
+            curBasicBlock.appendInstr(getElementPtr);
+            value = getElementPtr;
         }
+        if (!isOperand) {
+            return value;
+        }
+        if (value instanceof Argument) {
+            Alloca alloca = new Alloca(value.getTp(), SlotTracker.slot());
+            curBasicBlock.appendInstr(alloca);
+            Store store = new Store(new ValueType.Type(VoidTy), "");
+            store.addOperands(value);
+            store.addOperands(alloca);
+            curBasicBlock.appendInstr(store);
+            Load load = new Load(alloca.getTp().getActType(), SlotTracker.slot());
+            load.addOperands(alloca);
+            curBasicBlock.appendInstr(load);
+            return load;
+        }
+        if (value instanceof GlobalVariable || value instanceof Alloca || value instanceof GetElementPtr) {
+            Load load = new Load(value.getTp().getActType(), SlotTracker.slot());
+            load.addOperands(value);
+            curBasicBlock.appendInstr(load);
+            return load;
+        }
+        return value;
     }
 
-    public void visitFuncRParams(FuncFParams ffp, FuncRParams frp) {
+    public ArrayList<Value> visitFuncRParams(FuncFParams ffp, FuncRParams frp) {
+        ArrayList<Value> params = new ArrayList<>();
         if (ffp.getArgc() != frp.getArgc()) {
-            return;
+            return params;
         }
         for (int i = 0; i < ffp.getArgc(); i++) {
             FuncFParam fp = ffp.getParam(i);
@@ -601,24 +808,25 @@ public class Visitor {
             boolean isArray = false;    //  是否为数组
             String type = "";        //  类型为what, 只考虑数组情况。
             String name = rp.getIdentName();    //获取符号
-            if (findSymInStack(name, "Var")) {
-                Symbol sym;
-                sym = getSymInStack(name, "Var");
+            Symbol sym;
+            if ((sym = curTable.findSym(name, "Var")) != null) {
                 SymType st = sym.getType();
                 isArray = sym.getType().isArray() && !rp.isArray();
                 type = st.getType().toLowerCase();
             }
             if (isArray != fp.isArray()) {  // array or var不匹配
                 errors.add(new Error("e", rp.getLineno()));
-                return;
+                return params;
             } else if (isArray && fp.isArray()) {    // char or int 不匹配
                 if (!type.equals(fp.getType().getContent())) {
                     errors.add(new Error("e", rp.getLineno()));
-                    return;
+                    return params;
                 }
             }
-            visitAddExp(rp.getAddExp());
+            Value value = visitAddExp(rp.getAddExp());
+            params.add(value);
         }
+        return params;
     }
 
     public String getType(Token type) {
@@ -633,17 +841,22 @@ public class Visitor {
         }
     }
 
-    public DataType getDataType(String type) {
-        if (type.equals("Int")) {
-            return Integer32Ty;
-        } else if (type.equals("Char")) {
-            return Integer8Ty;
-        } else if (type.equals("IntArray")) {
-            return Pointer32Ty;
-        } else if (type.equals("CharArray")) {
-            return Pointer8Ty;
-        } else {
-            return VoidTy;
+    public ValueType.Type getDataType(String type) {
+        switch (type) {
+            case "Int":
+                return new ValueType.Type(Integer32Ty);
+            case "Char":
+                return new ValueType.Type(Integer8Ty);
+            case "IntArray":
+                return new ValueType.ArrayType(Integer32Ty);
+            case "CharArray":
+                return new ValueType.ArrayType(Integer8Ty);
+            case "IntPointer":
+                return new ValueType.PointerType(Integer32Ty);
+            case "CharPointer":
+                return new ValueType.PointerType(Integer8Ty);
+            default:
+                return new ValueType.Type(VoidTy);
         }
     }
 }

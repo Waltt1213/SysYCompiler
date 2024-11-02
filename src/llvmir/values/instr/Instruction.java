@@ -1,13 +1,12 @@
 package llvmir.values.instr;
 
-import llvmir.DataType;
 import llvmir.User;
-import llvmir.values.BasicBlock;
+import llvmir.ValueType;
 
 public class Instruction extends User {
     private final Type irType;
 
-    public Instruction(DataType vt, Type irType, String name) {
+    public Instruction(ValueType.Type vt, Type irType, String name) {
         super(vt, name);
         this.irType = irType;
     }

@@ -1,7 +1,7 @@
 package llvmir.values;
 
-import llvmir.DataType;
 import llvmir.Value;
+import llvmir.ValueType;
 import llvmir.values.instr.Instruction;
 
 import java.util.LinkedList;
@@ -11,7 +11,7 @@ public class BasicBlock extends Value {
     private Function parent;
     private boolean isTerminator;
 
-    public BasicBlock(DataType vt, String name) {
+    public BasicBlock(ValueType.Type vt, String name) {
         super(vt, name);
         instructions = new LinkedList<>();
     }

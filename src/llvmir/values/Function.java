@@ -1,8 +1,8 @@
 package llvmir.values;
 
-import llvmir.DataType;
 import llvmir.Module;
 import llvmir.Value;
+import llvmir.ValueType;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -14,7 +14,7 @@ public class Function extends Value {
     private boolean isDefine;
     private boolean isReturn;
 
-    public Function(DataType vt, String name, Module module,
+    public Function(ValueType.Type vt, String name, Module module,
                     boolean isDefine) {
         super(vt, name);
         basicBlocks = new LinkedList<>();
@@ -51,13 +51,23 @@ public class Function extends Value {
     }
 
     @Override
-    public String getName() {
-        return "@" + super.getName();
+    public String getDef() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(tp.toString()).append(" ");
+        sb.append(getFullName()).append("(");
+        for (int i = 0; i < funcFParams.size(); i++) {
+            sb.append(funcFParams.get(i).toString());
+            if (i < funcFParams.size() - 1) {
+                sb.append(", ");
+            }
+        }
+        sb.append(")");
+        return sb.toString();
     }
 
     @Override
-    public DataType getTp() {
-        return super.getTp();
+    public String getName() {
+        return "@" + super.getName();
     }
 
     @Override

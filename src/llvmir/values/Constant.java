@@ -1,14 +1,14 @@
 package llvmir.values;
 
-import llvmir.DataType;
 import llvmir.Value;
+import llvmir.ValueType;
 
 public class Constant extends Value {
     public Constant(String name) {
-        super(DataType.Integer32Ty, name);
+        super(new ValueType.Type(ValueType.DataType.Integer32Ty), name);
     }
 
-    public Constant(DataType type, String name) {
+    public Constant(ValueType.Type type, String name) {
         super(type, name);
     }
 
@@ -24,6 +24,6 @@ public class Constant extends Value {
 
     @Override
     public String toString() {
-        return name;
+        return tp.toString() + " " + name;
     }
 }

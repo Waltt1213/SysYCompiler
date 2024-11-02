@@ -11,7 +11,7 @@ public class Module extends Value {
     private ArrayList<Function> functions;
     private LinkedList<GlobalVariable> globalValues;
 
-    public Module(DataType vt, String name) {
+    public Module(ValueType.Type vt, String name) {
         super(vt, name);
         declares = new ArrayList<>();
         functions = new ArrayList<>();
@@ -28,6 +28,15 @@ public class Module extends Value {
 
     public void addGlobalValue(GlobalVariable gv) {
         globalValues.add(gv);
+    }
+
+    public Function getDeclare(String name) {
+        for (Function function : declares) {
+            if (function.name.equals(name)) {
+                return function;
+            }
+        }
+        return null;
     }
 
     @Override

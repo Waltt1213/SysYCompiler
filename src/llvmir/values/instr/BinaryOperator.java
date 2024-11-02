@@ -1,11 +1,11 @@
 package llvmir.values.instr;
 
-import llvmir.DataType;
 import llvmir.Value;
+import llvmir.ValueType;
 
 public class BinaryOperator extends Instruction {
 
-    public BinaryOperator(DataType vt, Type type, String name) {
+    public BinaryOperator(ValueType.Type vt, Type type, String name) {
         super(vt, type, name);
     }
 
@@ -15,8 +15,8 @@ public class BinaryOperator extends Instruction {
         Value value1 = getOperands().get(0);
         Value value2 = getOperands().get(1);
         sb.append(id).append(name).append(" = ");
-        sb.append(getIrType());
-        sb.append(value1.getDef()).append(", ").append(value2.getName());
+        sb.append(getIrType()).append(" nsw ");
+        sb.append(value1.getDef()).append(", ").append(value2.getFullName());
         return sb.toString();
     }
 }

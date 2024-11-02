@@ -38,6 +38,10 @@ public class ConstInitVal implements AstNode {
         return constExps;
     }
 
+    public Token getStringConst() {
+        return stringConst;
+    }
+
     public boolean isConstExp() {
         return constExp != null && constExps == null && stringConst == null;
     }

@@ -1,11 +1,11 @@
 package llvmir.values.instr;
 
-import llvmir.DataType;
+import llvmir.ValueType;
 
 public class Compare extends Instruction {
-    private CondType condType;
+    private final CondType condType;
 
-    public Compare(DataType vt, String name, String sym) {
+    public Compare(ValueType.Type vt, String name, String sym) {
         super(vt, Type.ICMP, name);
         condType = CondType.getOp(sym);
     }

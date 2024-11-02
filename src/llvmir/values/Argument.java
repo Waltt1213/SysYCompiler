@@ -1,10 +1,10 @@
 package llvmir.values;
 
-import llvmir.DataType;
 import llvmir.Value;
+import llvmir.ValueType;
 
 public class Argument extends Value {
-    public Argument(DataType vt, String name) {
+    public Argument(ValueType.Type vt, String name) {
         super(vt, name);
         id = localId;
     }
