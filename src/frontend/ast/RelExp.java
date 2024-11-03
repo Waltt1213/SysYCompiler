@@ -19,6 +19,10 @@ public class RelExp implements AstNode {
         return addExps;
     }
 
+    public ArrayList<Token> getOps() {
+        return ops;
+    }
+
     @Override
     public String getSymbol() {
         return "<RelExp>";

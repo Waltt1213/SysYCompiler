@@ -9,6 +9,7 @@ import java.util.ArrayList;
 public class GlobalVariable extends Value {
     private ArrayList<Value> initVal;
     private boolean unnamed = false;
+    private boolean isConstant = false;
 
     public GlobalVariable(ValueType.Type vt, String name) {
         super(vt, name);
@@ -18,6 +19,18 @@ public class GlobalVariable extends Value {
 
     public void setUnnamed(boolean unnamed) {
         this.unnamed = unnamed;
+    }
+
+    public void setConstant(boolean constant) {
+        isConstant = constant;
+    }
+
+    public boolean isConstant() {
+        return isConstant;
+    }
+
+    public boolean isArray() {
+        return tp.getDim() > 0;
     }
 
     public void setInitVal(ArrayList<Value> initVal) {
@@ -34,7 +47,7 @@ public class GlobalVariable extends Value {
 
     @Override
     public ValueType.Type getTp() {
-        return tp.getAddr();
+        return new ValueType.PointerType(tp);
     }
 
     public String getInits() {
@@ -71,11 +84,16 @@ public class GlobalVariable extends Value {
         StringBuilder sb = new StringBuilder();
         sb.append(getFullName()).append(" = ");
         if (unnamed) {
-            sb.append("private unnamed_addr constant ");
+            sb.append("private unnamed_addr ");
         } else {
-            sb.append("dso_local global ");
+            sb.append("dso_local ");
         }
-        if (tp.getDim() == 0) {
+        if (isConstant) {
+            sb.append("constant ");
+        } else {
+            sb.append("global ");
+        }
+        if (tp.getDim() == 0) { // 只有一个元素
             if (initVal != null && !initVal.isEmpty()) {
                 sb.append(tp).append(" ").append(initVal.get(0).getName());
             } else {

@@ -15,6 +15,6 @@ public class Alloca extends Instruction {
 
     @Override
     public String toString() {
-        return getFullName() + " = alloca " + tp.getActType().toString();
+        return getFullName() + " = alloca " + getTp().getActType().toString();
     }
 }

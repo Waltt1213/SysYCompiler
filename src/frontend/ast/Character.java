@@ -20,7 +20,7 @@ public class Character implements AstNode {
 
     public String getChar() {
         int ascii = Transform.str2int(charConst.getContent());
-        return String.valueOf(ascii);
+        return "'" + String.valueOf(ascii) + "'";
     }
 
     @Override

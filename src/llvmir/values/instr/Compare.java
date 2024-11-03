@@ -5,9 +5,9 @@ import llvmir.ValueType;
 public class Compare extends Instruction {
     private final CondType condType;
 
-    public Compare(ValueType.Type vt, String name, String sym) {
-        super(vt, Type.ICMP, name);
-        condType = CondType.getOp(sym);
+    public Compare(String name, CondType type) {
+        super(new ValueType.Type(ValueType.DataType.Integer1Ty), Type.ICMP, name);
+        condType = type;
     }
 
     public enum CondType {
@@ -47,5 +47,12 @@ public class Compare extends Instruction {
         public String toString() {
             return value;
         }
+    }
+
+    @Override
+    public String toString() {
+        return getFullName() + " = icmp " + condType + " "
+                + getOperands().get(0).getDef() + ", "
+                + getOperands().get(1).getFullName();
     }
 }

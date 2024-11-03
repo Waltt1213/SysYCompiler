@@ -138,10 +138,10 @@ public class Visitor {
         String funcType = getType(fd.getFuncType().getType());
         SymType ft = new SymType(funcType, false, false, true);
         String funcName = fd.getIdent().getContent();
+        Function function = new Function(getDataType(funcType), funcName, module, true);
+        // 创建函数并加入module
+        module.addFunction(function);
         try {
-            // 创建函数并加入module
-            Function function = new Function(getDataType(funcType), funcName, module, true);
-            module.addFunction(function);
             // 加入符号表
             Symbol funcSym = new Symbol(funcName, ft, curDepth, fd.getFuncType().getType().getLineno());
             if (fd.hasFParams()) { funcSym.setFuncFParams(fd.getFuncFParams()); }
@@ -150,12 +150,12 @@ public class Visitor {
             symStack.push(funcSym);
             curTable.addSymItem(funcName, funcSym);
             funcNameTable.put(funcName, funcSym);
-            // 创建一个基本块
-            curBasicBlock = new BasicBlock(new ValueType.Type(LabelTy), "");
-            function.addBasicBlock(curBasicBlock);
         } catch (Error e) {
             errors.add(new Error("b", fd.getFuncType().getType().getLineno()));
         }
+        // 创建一个基本块
+        curBasicBlock = new BasicBlock("");
+        function.addBasicBlock(curBasicBlock);
         // 形参需要加入符号表，但属于下一层级
         blockStack.push(BlockType.FuncBlock);
         curDepth++;
@@ -164,12 +164,14 @@ public class Visitor {
         curTable = st;
         symbolTables.add(curTable); // 将符号表加入符号表集
         tableStack.push(curTable); // 入栈
+        ArrayList<Symbol> paramsSym = new ArrayList<>();
         if (fd.getFuncFParams() != null) {
             try {
-                visitFuncFParams(fd.getFuncFParams());  // 函数形参与函数块内符号属于同一层级
+                paramsSym = visitFuncFParams(fd.getFuncFParams());  // 函数形参与函数块内符号属于同一层级
             } catch (Error e) { errors.add(e); }
         }
         curBasicBlock.setName(SlotTracker.slot()); // 基本块占一个%
+        buildParamInit(paramsSym);
         visitBlock(fd.getBlock());  // 构建函数内符号表
         if (!ft.toString().equals("VoidFunc") && !fd.getBlock().hasRet()) {
             errors.add(new Error("g", fd.getBlock().getLineno()));
@@ -212,7 +214,7 @@ public class Visitor {
         // 加入module
         module.addFunction(main);
         // 添加一个基本块
-        curBasicBlock = new BasicBlock(new ValueType.Type(LabelTy), "");
+        curBasicBlock = new BasicBlock("");
         main.addBasicBlock(curBasicBlock);
         if (!astNode.getBlock().hasRet()) {
             errors.add(new Error("g", (astNode).getBlock().getLineno()));
@@ -241,10 +243,8 @@ public class Visitor {
         ValueType.Type type = getDataType(varType);
         if (constDef.hasArray()) {
             Value dim = visitConstExp(constDef.getConstExp());
-            if (dim instanceof Constant) {
-                type = getDataType(varType + "Array");
-                ((ValueType.ArrayType) type).setDim(Integer.parseInt(dim.getName()));
-            }
+            type = getDataType(varType + "Array");
+            ((ValueType.ArrayType) type).setDim(Integer.parseInt(dim.getName()));
         }
         // 判断是否为全局变量
         if (curTable.getFatherTable() == null) { // 全局变量
@@ -253,6 +253,7 @@ public class Visitor {
             ArrayList<Value> constants = visitConstInitVal(constDef.getConstInitVal());
             value.setInitVal(constants);
             var.setValue(value);
+            value.setConstant(true);
         } else {
             // 局部变量先alloca
             Alloca alloca = new Alloca(type, SlotTracker.slot());
@@ -264,10 +265,12 @@ public class Visitor {
         }
     }
 
-    public void buildLocalInit(Alloca alloca, ArrayList<Value> constants) {
-        if (constants.size() == 1) {
+    public void buildLocalInit(Alloca alloca, ArrayList<Value> inits) { // TODO: 有大问题
+        if (inits.size() == 1) { // 单个常量 or 字符串
+            Value value = inits.get(0);
+
             if (alloca.getTp().getDataType() == Integer8Ty) {
-                String s = constants.get(0).getName();
+                String s = inits.get(0).getName();
                 s = s.substring(1, s.length() - 1); // 删去“”
                 ArrayList<Integer> str2int = Transform.str2intList(s);
                 Value prePtr = alloca;
@@ -289,13 +292,13 @@ public class Visitor {
                 }
             } else {
                 Store store = new Store(new ValueType.Type(VoidTy), "");
-                store.addOperands(constants.get(0));
+                store.addOperands(inits.get(0));
                 store.addOperands(alloca);
                 curBasicBlock.appendInstr(store);
             }
         } else {
             Value prePtr = alloca;
-            for (int i = 0;  i < constants.size(); i++) {
+            for (int i = 0;  i < inits.size(); i++) {
                 GetElementPtr getElementPtr = new GetElementPtr(prePtr.getTp(), SlotTracker.slot());
                 getElementPtr.addOperands(prePtr);
                 if (i == 0) {
@@ -306,7 +309,7 @@ public class Visitor {
                 }
                 curBasicBlock.appendInstr(getElementPtr);
                 Store store = new Store(new ValueType.Type(VoidTy), "");
-                store.addOperands(constants.get(i));
+                store.addOperands(inits.get(i));
                 store.addOperands(getElementPtr);
                 curBasicBlock.appendInstr(store);
                 prePtr = getElementPtr;
@@ -314,8 +317,8 @@ public class Visitor {
         }
     }
 
-    public Value visitConstExp(ConstExp constExp) {
-        return visitAddExp(constExp.getAddExp());
+    public Constant visitConstExp(ConstExp constExp) {
+        return (Constant) visitAddExp(constExp.getAddExp());
     }
 
     public ArrayList<Value> visitConstInitVal(ConstInitVal constInitVal) {
@@ -354,10 +357,8 @@ public class Visitor {
         ValueType.Type type = getDataType(varType);
         if (varDef.hasConstExp()) {
             Value dim = visitConstExp(varDef.getConstExp());
-            if (dim instanceof Constant) {
-                type = getDataType(varType + "Array");
-                ((ValueType.ArrayType) type).setDim(Integer.parseInt(dim.getName()));
-            }
+            type = getDataType(varType + "Array");
+            ((ValueType.ArrayType) type).setDim(Integer.parseInt(dim.getName()));
         }
         if (curTable.getFatherTable() == null) {
             GlobalVariable globalVariable = new GlobalVariable(type, varName);
@@ -398,7 +399,8 @@ public class Visitor {
         return new Constant(new ValueType.ArrayType(Integer8Ty), string.getContent());
     }
 
-    public void visitFuncFParams(FuncFParams fps) throws Error {
+    public ArrayList<Symbol> visitFuncFParams(FuncFParams fps) throws Error {
+        ArrayList<Symbol> paramsSym = new ArrayList<>();
         for (AstNode node : fps.getAstChild()) {
             FuncFParam fp = (FuncFParam) node;
             String funcVarName = fp.getIdentName();
@@ -409,12 +411,25 @@ public class Visitor {
             // 创建参数并加入函数
             Argument argument = new Argument(getDataType(funcVarType), SlotTracker.slot());
             curFunction.addParams(argument);
-            // 加入符号表
-            SymType st = new SymType(funcVarType, fp.isArray(), false, false);
+            SymType st = new SymType(getType(fp.getType()), fp.isArray(), false, false);
             Symbol symbol = new Symbol(funcVarName, st, curDepth, fp.getIdent().getLineno());
-            symbol.setValue(argument);
             curTable.addSymItem(funcVarName, symbol);
             symStack.push(symbol);
+            paramsSym.add(symbol);
+        }
+        return paramsSym;
+    }
+
+    public void buildParamInit(ArrayList<Symbol> paramsSym) {
+        for (Argument argument: curFunction.getFuncFParams()) {
+            Alloca alloca = new Alloca(argument.getTp(), SlotTracker.slot());
+            curBasicBlock.appendInstr(alloca);
+            Store store = new Store(new ValueType.Type(VoidTy), "");
+            store.addOperands(argument);
+            store.addOperands(alloca);
+            curBasicBlock.appendInstr(store);
+            Symbol symbol = paramsSym.remove(0);
+            symbol.setValue(alloca);
         }
     }
 
@@ -422,23 +437,9 @@ public class Visitor {
         if (stmt.getType() == Stmt.StmtType.RETURN) {
             visitReturn(stmt);
         } else if (stmt.getType() == Stmt.StmtType.IF) {
-            visitLOrExp(((Cond) stmt.getStmts().get(0)).getLorExp());
-            visitStmt((Stmt) stmt.getStmts().get(1));
-            if (stmt.getStmts().size() > 2) {
-                visitStmt((Stmt) stmt.getStmts().get(2));
-            }
+            visitIf(stmt);
         } else if (stmt.getType() == Stmt.StmtType.FOR) {
-            blockStack.push(BlockType.forBlock);
-            for (AstNode node : stmt.getStmts()) {
-                if (node instanceof ForStmt) {
-                    visitForStmt((ForStmt) node);
-                } else if (node instanceof Cond) {
-                    visitLOrExp(((Cond) node).getLorExp());
-                } else if (node instanceof Stmt) {
-                    visitStmt((Stmt) node);
-                }
-            }
-            blockStack.pop();
+            visitFor(stmt);
         } else if (stmt.getType() == Stmt.StmtType.BREAK
                 || stmt.getType() == Stmt.StmtType.CONTINUE) {
             BlockType bt = blockStack.peek();
@@ -503,11 +504,97 @@ public class Visitor {
         }
         if (!stmt.getStmts().isEmpty()) {
             Value ret = visitAddExp(((Exp) stmt.getStmts().get(0)).getAddExp());
-            curFunction.setReturn(true);
+            curFunction.setNotVoid(true);
             curBasicBlock.appendInstr(new Return(null, ret));
         } else {
             curBasicBlock.appendInstr(new Return(null));
         }
+    }
+
+    public void visitIf(Stmt stmt) {
+        BasicBlock ifBlock = new BasicBlock("");
+        BasicBlock endBlock = new BasicBlock("");
+        BasicBlock elseBlock = null;
+        if (stmt.getStmts().size() > 2) {
+            elseBlock = new BasicBlock("");
+        }
+        // 进入条件判断
+        visitCond((Cond) stmt.getStmts().get(0), ifBlock, endBlock, elseBlock);
+        ifBlock.setName(SlotTracker.slot());
+        curFunction.addBasicBlock(ifBlock);
+        // 进入ifBlock
+        curBasicBlock = ifBlock;
+        visitStmt((Stmt) stmt.getStmts().get(1));
+        Branch out = new Branch("");
+        out.addOperands(endBlock);
+        curBasicBlock.appendInstr(out);
+        // 进入else
+        if (stmt.getStmts().size() > 2 && elseBlock != null) {
+            elseBlock.setName(SlotTracker.slot());
+            curFunction.addBasicBlock(elseBlock);
+            curBasicBlock = elseBlock;
+            visitStmt((Stmt) stmt.getStmts().get(2));
+            Branch out2 = new Branch("");
+            out2.addOperands(endBlock);
+            curBasicBlock.appendInstr(out2);
+        }
+        endBlock.setName(SlotTracker.slot());
+        curBasicBlock = endBlock;
+        curFunction.addBasicBlock(endBlock);
+    }
+
+    public void visitCond(Cond cond, BasicBlock ifBlock, BasicBlock endBlock, BasicBlock elseBlock) {
+        ArrayList<BasicBlock> blocks = new ArrayList<>();
+        blocks.add(ifBlock);
+        blocks.add(endBlock);
+        blocks.add(elseBlock);
+        visitLOrExp(cond.getLorExp(), blocks);
+    }
+
+    public void visitFor(Stmt stmt) {
+        blockStack.push(BlockType.forBlock);
+        BasicBlock judgeBlock = new BasicBlock("");
+        BasicBlock condBlock = new BasicBlock("");
+        BasicBlock endBlock = new BasicBlock("");
+        // 初始化
+        if (stmt.getStmts().get(0) != null) {
+            visitForStmt((ForStmt) stmt.getStmts().get(0)); // 执行第一个ForStmt
+        }
+        // 进入条件判断
+        curBasicBlock = judgeBlock;
+        if (stmt.getStmts().get(1) != null) {
+            judgeBlock.setName(SlotTracker.slot());
+            visitCond((Cond) stmt.getStmts().get(1), condBlock, endBlock, null);
+            curFunction.addBasicBlock(judgeBlock);
+        }
+        // 进入条件执行体
+        condBlock.setName(SlotTracker.slot());
+        curBasicBlock = condBlock;
+        curFunction.addBasicBlock(condBlock);
+        visitStmt((Stmt) stmt.getStmts().get(3));
+        if (stmt.getStmts().get(2) != null) {
+            // 跳转到continueBlock
+            BasicBlock continueBlock = new BasicBlock(SlotTracker.slot());
+            Branch join = new Branch("");
+            join.addOperands(continueBlock);
+            curBasicBlock.appendInstr(join);
+            curFunction.addBasicBlock(continueBlock);
+            curBasicBlock = continueBlock;
+            visitForStmt((ForStmt) stmt.getStmts().get(0)); // 执行第一个ForStmt
+        }
+        // 继续跳转到判断语句或执行体
+        Branch next = new Branch("");
+        if (stmt.getStmts().get(1) != null) {
+            next.addOperands(judgeBlock);
+        } else {
+            next.addOperands(condBlock);
+        }
+        curBasicBlock.appendInstr(next);
+        // 进入结束块
+        endBlock.setName(SlotTracker.slot());
+        curBasicBlock = endBlock;
+        curFunction.addBasicBlock(endBlock);
+        blockStack.pop();
     }
 
     public void visitPrintf(Stmt stmt) {
@@ -533,6 +620,7 @@ public class Visitor {
                     System.out.println(globalStr);
                     GlobalVariable var = new GlobalVariable(arrayType, SlotTracker.slotStr());
                     var.setUnnamed(true);
+                    var.setConstant(true);
                     var.addInitVal(new Constant(new ValueType.ArrayType(Integer8Ty), globalStr));
                     module.addGlobalValue(var);
                     buildPrintf(var, 's'); // 打印字符串
@@ -552,6 +640,7 @@ public class Visitor {
             System.out.println(globalStr);
             GlobalVariable var = new GlobalVariable(arrayType, SlotTracker.slotStr());
             var.setUnnamed(true);
+            var.setConstant(true);
             var.addInitVal(new Constant(new ValueType.ArrayType(Integer8Ty), globalStr));
             module.addGlobalValue(var);
             buildPrintf(var, 's'); // 打印字符串
@@ -592,31 +681,153 @@ public class Visitor {
                 errors.add(new Error("h", forStmt.getLineno()));
             }
         }
-        visitLVal(forStmt.getLval(), false);
-        visitAddExp(forStmt.getExp().getAddExp());
+        Value value = visitLVal(forStmt.getLval(), false);
+        Value res = visitAddExp(forStmt.getExp().getAddExp());
+        Store store = new Store(new ValueType.Type(VoidTy), "");
+        store.addOperands(res);
+        store.addOperands(value);
+        curBasicBlock.appendInstr(store);
     }
 
-    public void visitLOrExp(LOrExp lOrExp) {
-        for (LAndExp lAndExp : lOrExp.getLAndExps()) {
-            visitLAndExp(lAndExp);
+    public void visitLOrExp(LOrExp lOrExp, ArrayList<BasicBlock> blocks) {
+        BasicBlock next; // 表示后面还有或判断
+        for (int i = 0; i < lOrExp.getLAndExps().size(); i++) {
+            if (i < lOrExp.getLAndExps().size() - 1) {
+                next = new BasicBlock("");
+            } else {
+                next = null;
+            }
+            blocks.add(3, next);
+            Value value = visitLAndExp(lOrExp.getLAndExps().get(i), blocks);
+            BasicBlock falseBlock = null;
+            if (i == lOrExp.getLAndExps().size() - 1) {
+                if (blocks.get(2) == null) { // 如果没有else
+                    falseBlock = blocks.get(1); // false则跳转至endBlock
+                } else {
+                    falseBlock = blocks.get(2); // false则跳转至elseBlock
+                }
+            } else if (next != null) { // 后面还有或语句
+                next.setName(SlotTracker.slot());
+                falseBlock = next;
+                curFunction.addBasicBlock(next);
+            }
+            if (i != lOrExp.getLAndExps().size() - 1
+                    || lOrExp.getLAndExps().get(i).getEqExps().size() <= 1) {
+                Branch branch = new Branch("");
+                branch.addOperands(value);
+                branch.addOperands(blocks.get(0));
+                branch.addOperands(falseBlock);
+                curBasicBlock.appendInstr(branch);
+            }
+            curBasicBlock = falseBlock;
         }
     }
 
-    public void visitLAndExp(LAndExp lAndExp) {
-        for (EqExp eqExp : lAndExp.getEqExps()) {
-            visitEqExp(eqExp);
+    public Value visitLAndExp(LAndExp lAndExp, ArrayList<BasicBlock> blocks) {
+        if (lAndExp.getEqExps().size() == 1) {
+            return visitEqExp(lAndExp.getEqExps().get(0));
+        }
+        Value value = null;
+        for (int i = 0; i < lAndExp.getEqExps().size(); i++) {
+            value = visitEqExp(lAndExp.getEqExps().get(i));
+            BasicBlock tureBlock = null;
+            // 如果后面没有与判断，如果为真则跳转到ifBlock
+            // 如果后面还有判断，则跳转到下一个基本块中判断
+            if (i == lAndExp.getEqExps().size() - 1) {
+                tureBlock = blocks.get(0);
+            } else {
+                BasicBlock judge = new BasicBlock(SlotTracker.slot()); // 新的基本块做下一个与判断
+                tureBlock = judge;
+                curFunction.addBasicBlock(judge);
+            }
+            Branch branch = new Branch("");
+            branch.addOperands(value);
+            branch.addOperands(tureBlock);
+            // 如果后面还有或判断，则如果为假继续判断
+            // 如果后面无或判断，则跳到else或者end
+            if (blocks.get(3) != null) {
+                branch.addOperands(blocks.get(3));  // else judgeBlock
+            } else if (blocks.get(2) != null) {
+                branch.addOperands(blocks.get(2));  // else elseblock
+            } else {
+                branch.addOperands(blocks.get(1));  // else endblock
+            }
+            curBasicBlock.appendInstr(branch);
+            if (i != lAndExp.getEqExps().size() - 1) {
+                curBasicBlock = tureBlock;
+            }
+        }
+        return value;
+    }
+
+    public Value visitEqExp(EqExp eqExp) {
+        if (eqExp.getRelExps().size() == 1) {
+            return visitRelExp(eqExp.getRelExps().get(0));
+        }
+        Value res = null;
+        for (int i = 1; i < eqExp.getRelExps().size(); i++) {
+            Value value1 = i == 1 ? visitRelExp(eqExp.getRelExps().get(0)) : res;
+            Value value2 = visitRelExp(eqExp.getRelExps().get(i));
+            // 如果value1 和 value2 是Const
+            res = getCmpInstr(value1, value2, Compare.CondType.getOp(eqExp.getOps().get(i - 1).getContent()));
+        }
+        return res;
+    }
+
+    public Value visitRelExp(RelExp relExp) {
+        if (relExp.getAddExps().size() == 1) {
+            return visitAddExp(relExp.getAddExps().get(0));
+        }
+        Value res = null;
+        for (int i = 1; i < relExp.getAddExps().size(); i++) {
+            Value value1 = i == 1 ? visitAddExp(relExp.getAddExps().get(0)) : res;
+            Value value2 = visitAddExp(relExp.getAddExps().get(i));
+            // 如果value1 和 value2 是Const
+            res = getCmpInstr(value1, value2, Compare.CondType.getOp(relExp.getOps().get(i - 1).getContent()));
+        }
+        return res;
+    }
+
+    public Value getCmpInstr(Value value1, Value value2, Compare.CondType type) {
+        if (value1 == null || value2 == null) {
+            return null;
+        }
+        if (value1 instanceof Constant && value2 instanceof Constant) {
+            return cmpConst((Constant) value1, (Constant) value2, type);
+        } else {
+            Value zextValue1 = zext(value1);
+            Value zextValue2 = zext(value2);
+            Compare compare = new Compare(SlotTracker.slot(), type);
+            compare.addOperands(zextValue1);
+            compare.addOperands(zextValue2);
+            curBasicBlock.appendInstr(compare);
+            return compare;
         }
     }
 
-    public void visitEqExp(EqExp eqExp) {
-        for (RelExp relExp: eqExp.getRelExps()) {
-            visitRelExp(relExp);
-        }
-    }
-
-    public void visitRelExp(RelExp relExp) {
-        for (AddExp addExp: relExp.getAddExps()) {
-            visitAddExp(addExp);
+    public Constant cmpConst(Constant value1, Constant value2, Compare.CondType type) {
+        ValueType.Type valueType = new ValueType.Type(Integer1Ty);
+        switch (type) {
+            case EQ:
+                return new Constant(valueType, Boolean.toString(Integer.parseInt(value1.getName())
+                        == Integer.parseInt(value2.getName())));
+            case NE:
+                return new Constant(valueType, Boolean.toString(Integer.parseInt(value1.getName())
+                        != Integer.parseInt(value2.getName())));
+            case SGE:
+                return new Constant(valueType, Boolean.toString(Integer.parseInt(value1.getName())
+                        >= Integer.parseInt(value2.getName())));
+            case SGT:
+                return new Constant(valueType, Boolean.toString(Integer.parseInt(value1.getName())
+                        > Integer.parseInt(value2.getName())));
+            case SLE:
+                return new Constant(valueType, Boolean.toString(Integer.parseInt(value1.getName())
+                        <= Integer.parseInt(value2.getName())));
+            case SLT:
+                return new Constant(valueType, Boolean.toString(Integer.parseInt(value1.getName())
+                    < Integer.parseInt(value2.getName())));
+            default:
+                return null;
         }
     }
 
@@ -713,7 +924,7 @@ public class Visitor {
                     errors.add(new Error("d", unaryExp.getLineno()));
                 } else if (func != null) {
                     call.setFuncRParams(visitFuncRParams(func.getFuncFParams(), unaryExp.getFuncRParams()));
-                    if (callFunc.isReturn()) {
+                    if (callFunc.isNotVoid()) {
                         call.setName(SlotTracker.slot());
                     }
                 }
@@ -732,7 +943,7 @@ public class Visitor {
             } else { // 取反操作就是与0比较是否相等
                 Value value1 = visitUnaryExp(unaryExp.getUnaryExp());
                 Value value2 = new Constant("0");
-                Compare compare = new Compare(new ValueType.Type(Integer32Ty), SlotTracker.slot(), "!=");
+                Compare compare = new Compare(SlotTracker.slot(), Compare.CondType.getOp("!="));
                 compare.addOperands(value1);
                 compare.addOperands(value2);
                 curBasicBlock.appendInstr(compare);
@@ -760,33 +971,45 @@ public class Visitor {
         Symbol symbol;
         if ((symbol = curTable.findSym(name, "Var")) == null) {
             errors.add(new Error("c", lVal.getIdent().getLineno()));
-            return null;
+            return new Value(new ValueType.Type(Integer32Ty), "null");
         }
         Value value = symbol.getValue();
-        if (lVal.isArray()) {
+        if (lVal.isArrayElement()) { // 传递数组元素指针
             Value index = visitAddExp(lVal.getExp().getAddExp());
+            if (value.getTp().getActType() instanceof ValueType.PointerType) {
+                Load load = new Load(value.getTp().getActType(), SlotTracker.slot());
+                load.addOperands(value);
+                curBasicBlock.appendInstr(load);
+                value = load;
+            }
             String bis = index.getName();
             GetElementPtr getElementPtr = new GetElementPtr(value.getTp(), SlotTracker.slot());
             getElementPtr.addOperands(value);
-            getElementPtr.addOperands(new Constant("0"));
+            if (value.getTp().getActType() instanceof ValueType.ArrayType) {
+                getElementPtr.addOperands(new Constant("0"));
+            }
             getElementPtr.addOperands(new Constant(bis));
             curBasicBlock.appendInstr(getElementPtr);
             value = getElementPtr;
-        }
-        if (!isOperand) {
+        } else if (value.getTp() instanceof ValueType.PointerType
+                && value.getTp().getActType() instanceof ValueType.ArrayType) { // 例如传递数组指针
+            GetElementPtr getElementPtr = new GetElementPtr(value.getTp(), SlotTracker.slot());
+            getElementPtr.addOperands(value);
+            getElementPtr.addOperands(new Constant("0"));
+            getElementPtr.addOperands(new Constant("0"));
+            curBasicBlock.appendInstr(getElementPtr);
+            value = getElementPtr;
             return value;
         }
-        if (value instanceof Argument) {
-            Alloca alloca = new Alloca(value.getTp(), SlotTracker.slot());
-            curBasicBlock.appendInstr(alloca);
-            Store store = new Store(new ValueType.Type(VoidTy), "");
-            store.addOperands(value);
-            store.addOperands(alloca);
-            curBasicBlock.appendInstr(store);
-            Load load = new Load(alloca.getTp().getActType(), SlotTracker.slot());
-            load.addOperands(alloca);
-            curBasicBlock.appendInstr(load);
-            return load;
+        if (!isOperand) { // 等号左边的左值，需要返回的是指针
+            return value;
+        }
+        // 等号右边的左值，需要返回的是load下来的值
+        if (value instanceof GlobalVariable) {
+            GlobalVariable globalVar = (GlobalVariable) value;
+            if (globalVar.isConstant() && !globalVar.isArray()) {
+                return globalVar.getInitVal().get(0);
+            }
         }
         if (value instanceof GlobalVariable || value instanceof Alloca || value instanceof GetElementPtr) {
             Load load = new Load(value.getTp().getActType(), SlotTracker.slot());

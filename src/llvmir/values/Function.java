@@ -3,6 +3,7 @@ package llvmir.values;
 import llvmir.Module;
 import llvmir.Value;
 import llvmir.ValueType;
+import llvmir.values.instr.Return;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -12,6 +13,7 @@ public class Function extends Value {
     private LinkedList<BasicBlock> basicBlocks;
     private final Module parent;
     private boolean isDefine;
+    private boolean isNotVoid;
     private boolean isReturn;
 
     public Function(ValueType.Type vt, String name, Module module,
@@ -21,7 +23,7 @@ public class Function extends Value {
         parent = module;
         funcFParams = new ArrayList<>();
         this.isDefine = isDefine;
-        isReturn = false;
+        isNotVoid = false;
         id = globalId;
     }
 
@@ -37,12 +39,27 @@ public class Function extends Value {
         basicBlocks.add(basicBlock);
     }
 
-    public void setReturn(boolean isReturn) {
-        this.isReturn = isReturn;
+    public void setNotVoid(boolean isReturn) {
+        this.isNotVoid = isReturn;
+    }
+
+    public boolean isNotVoid() {
+        return isNotVoid;
+    }
+
+    public ArrayList<Argument> getFuncFParams() {
+        return funcFParams;
     }
 
     public boolean isReturn() {
         return isReturn;
+    }
+
+    public void setReturn() {
+        isReturn = true;
+        BasicBlock basicBlock = basicBlocks.getLast();
+        Return ret = new Return(null);
+        basicBlock.appendInstr(ret);
     }
 
     @Override

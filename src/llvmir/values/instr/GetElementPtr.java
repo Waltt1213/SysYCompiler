@@ -20,13 +20,14 @@ public class GetElementPtr extends Instruction {
             return super.getDef();
         }
         StringBuilder sb = new StringBuilder();
-        sb.append(getTp()).append(" getelementptr inbounds ");
+        sb.append(getTp()).append(" getelementptr inbounds (");
         sb.append(tp.getActType()).append(", ");
         sb.append(getOperands().get(0).getDef());
         sb.append(", ").append(getOperands().get(1).getDef());
         if (getOperands().size() > 2) {
             sb.append(", ").append(getOperands().get(2).getDef());
         }
+        sb.append(")");
         return sb.toString();
     }
 

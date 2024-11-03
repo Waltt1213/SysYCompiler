@@ -27,7 +27,7 @@ public class PrimaryExp implements AstNode {
 
     public boolean isArray() {
         if (primaryExp instanceof LVal) {
-            return ((LVal) primaryExp).isArray();
+            return ((LVal) primaryExp).isArrayElement();
         } else if (primaryExp instanceof Exp) {
             return ((Exp) primaryExp).isArray();
         }

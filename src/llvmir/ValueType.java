@@ -8,8 +8,9 @@ public class ValueType {
         LabelTy("label"),      //标签类型
 
         // Derived types
+        Integer1Ty("i1"),   //1位布尔类型
         Integer8Ty("i8"),    //8位整数类型
-        Integer32Ty("i32"),
+        Integer32Ty("i32"), //32位整数类型
         Integer64Ty("i64");    //32位整数类型
 
         private final String value;

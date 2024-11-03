@@ -18,7 +18,9 @@ public class User extends Value {
 
     public void addOperands(Value value) {
         operands.add(value); // 使用这个value作为操作数
-        value.addUser(this); // value被自己使用
+        if (value != null) {
+            value.addUser(this); // value被自己使用
+        }
     }
 
     @Override

@@ -33,7 +33,7 @@ public class LVal implements AstNode {
         return ident.getContent();
     }
 
-    public boolean isArray() {
+    public boolean isArrayElement() {
         return exp != null;
     }
 
