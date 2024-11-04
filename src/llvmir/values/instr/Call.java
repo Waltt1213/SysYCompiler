@@ -34,6 +34,10 @@ public class Call extends Instruction {
         funcRParams.add(param);
     }
 
+    public boolean isNotVoid() {
+        return callFunc.isNotVoid();
+    }
+
     public String getCall() {
         StringBuilder sb = new StringBuilder();
         sb.append(callFunc.getTp().toString()).append(" ");

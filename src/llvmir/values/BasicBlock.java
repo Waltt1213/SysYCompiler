@@ -2,7 +2,6 @@ package llvmir.values;
 
 import llvmir.Value;
 import llvmir.ValueType;
-import llvmir.values.instr.Branch;
 import llvmir.values.instr.Instruction;
 
 import java.util.ArrayList;
@@ -80,7 +79,7 @@ public class BasicBlock extends Value {
 
     public static class ForBlock extends BasicBlock {
         private BasicBlock outBlock;
-        private BasicBlock judgeBlock;
+        private BasicBlock updateBlock;
 
         public ForBlock(String name, BasicBlock outBlock) {
             super(name);
@@ -91,19 +90,19 @@ public class BasicBlock extends Value {
             this.outBlock = outBlock;
         }
 
-        public void setJudgeBlock(BasicBlock judgeBlock) {
-            this.judgeBlock = judgeBlock;
+        public void setUpdateBlock(BasicBlock updateBlock) {
+            this.updateBlock = updateBlock;
         }
 
         public BasicBlock getOutBlock() {
             return outBlock;
         }
 
-        public BasicBlock getJudgeBlock() {
-            if (judgeBlock == null) {
+        public BasicBlock getUpdateBlock() {
+            if (updateBlock == null) {
                 return this;
             }
-            return judgeBlock;
+            return updateBlock;
         }
     }
 }

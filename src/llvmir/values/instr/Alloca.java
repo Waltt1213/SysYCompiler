@@ -8,6 +8,10 @@ public class Alloca extends Instruction {
         super(vt, Type.ALLOCA, name);
     }
 
+    public ValueType.DataType getDataType() {
+        return tp.getDataType();
+    }
+
     @Override
     public ValueType.Type getTp() {
         return new ValueType.PointerType(tp);

@@ -15,7 +15,7 @@ public class BinaryOperator extends Instruction {
         Value value1 = getOperands().get(0);
         Value value2 = getOperands().get(1);
         sb.append(id).append(name).append(" = ");
-        sb.append(getIrType()).append(" nsw ");
+        sb.append(getIrType()).append(" ");
         sb.append(value1.getDef()).append(", ").append(value2.getFullName());
         return sb.toString();
     }

@@ -22,6 +22,10 @@ public class Constant extends Value {
         return isString;
     }
 
+    public void setTp(ValueType.Type tp) {
+        this.tp = tp;
+    }
+
     @Override
     public String getFullName() {
         return name;

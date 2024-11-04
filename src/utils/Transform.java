@@ -20,11 +20,11 @@ public class Transform {
     }};
 
     public static int str2int(String str) {
-        if (str.substring(1, str.length() - 1).length() == 1) {
-            return str.substring(1, str.length() - 1).charAt(0);
+        if (str.length() == 1) {
+            return str.charAt(0);
         } else {
-            if (asciiMap.containsKey(str.substring(1, str.length() - 1))) {
-                return asciiMap.get(str.substring(1, str.length() - 1));
+            if (asciiMap.containsKey(str)) {
+                return asciiMap.get(str);
             }
             return 0;
         }
@@ -51,12 +51,12 @@ public class Transform {
     }
 
     /**
-     * @param charList  含引号文本形式的字符串
+     * @param charList  文本形式的字符串
      * @return 不含引号允许转义含义的字符串
      */
     public static String charList2string(String charList) {
         StringBuilder sb = new StringBuilder();
-        for (int i = 1; i < charList.length() - 1; i++) {
+        for (int i = 0; i < charList.length(); i++) {
             if (charList.charAt(i) == '\\' && charList.charAt(i + 1) == 'n') {
                 sb.append("\n");
                 i++;

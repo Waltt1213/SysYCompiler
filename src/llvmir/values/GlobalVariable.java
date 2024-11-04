@@ -45,6 +45,10 @@ public class GlobalVariable extends Value {
         initVal.add(value);
     }
 
+    public ValueType.Type getElementType() {
+        return new ValueType.Type(tp.getDataType());
+    }
+
     @Override
     public ValueType.Type getTp() {
         return new ValueType.PointerType(tp);
@@ -58,7 +62,6 @@ public class GlobalVariable extends Value {
             String s = Transform.charList2string(initVal.get(0).getName());
             sb.append(" c\"").append(Transform.str2charList(s));
             for (int i = s.length(); i < type.getDim(); i++) {
-                System.out.println(s.length());
                 sb.append("\\00");
             }
             sb.append("\"");
@@ -68,7 +71,7 @@ public class GlobalVariable extends Value {
                 if (i < initVal.size()) {
                     sb.append(initVal.get(i).getDef());
                 } else {
-                    sb.append(tp.toString(), 0, tp.toString().length() - 1).append(" 0");
+                    sb.append(getElementType()).append(" 0");
                 }
                 if (i < tp.getDim() - 1) {
                     sb.append(", ");

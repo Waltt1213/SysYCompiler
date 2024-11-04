@@ -273,10 +273,9 @@ public class Visitor {
     public void buildLocalInit(Alloca alloca, ArrayList<Value> inits) { // TODO: 有大问题
         if (inits.size() == 1) { // 单个常量 or 字符串
             Value value = inits.get(0);
-
-            if (alloca.getTp().getDataType() == Integer8Ty) {
+            if (value instanceof Constant && ((Constant) value).isString()) {
                 String s = inits.get(0).getName();
-                s = s.substring(1, s.length() - 1); // 删去“”
+                //s = s.substring(1, s.length() - 1); // 删去“”
                 ArrayList<Integer> str2int = Transform.str2intList(s);
                 Value prePtr = alloca;
                 for (int i = 0;  i < str2int.size(); i++) {
@@ -290,16 +289,13 @@ public class Visitor {
                     }
                     curBasicBlock.appendInstr(getElementPtr);
                     Store store = new Store(new ValueType.Type(VoidTy), "");
-                    store.addOperands(new Constant(String.valueOf(str2int.get(i))));
+                    store.addOperands(new Constant(new ValueType.Type(Integer8Ty), String.valueOf(str2int.get(i))));
                     store.addOperands(getElementPtr);
                     curBasicBlock.appendInstr(store);
                     prePtr = getElementPtr;
                 }
             } else {
-                Store store = new Store(new ValueType.Type(VoidTy), "");
-                store.addOperands(inits.get(0));
-                store.addOperands(alloca);
-                curBasicBlock.appendInstr(store);
+                buildInit(alloca, inits.get(0));
             }
         } else {
             Value prePtr = alloca;
@@ -313,13 +309,25 @@ public class Visitor {
                     getElementPtr.addOperands(new Constant("1"));
                 }
                 curBasicBlock.appendInstr(getElementPtr);
-                Store store = new Store(new ValueType.Type(VoidTy), "");
-                store.addOperands(inits.get(i));
-                store.addOperands(getElementPtr);
-                curBasicBlock.appendInstr(store);
+                buildInit(getElementPtr, inits.get(i));
                 prePtr = getElementPtr;
             }
         }
+    }
+
+    public void buildInit(Value value1, Value value2) { // value1 = value2
+        Store store = new Store(new ValueType.Type(VoidTy), "");
+        // TODO
+        Value res = value2;
+        if (value2.getTp().getDataType().compareTo(value1.getTp().getDataType()) > 0) {
+            // 需要trunc
+            res = trunc(value2);
+        } else if (value2.getTp().getDataType().compareTo(value1.getTp().getDataType()) < 0) {
+            res = zext(value2);
+        }
+        store.addOperands(res);
+        store.addOperands(value1);
+        curBasicBlock.appendInstr(store);
     }
 
     public Constant visitConstExp(ConstExp constExp) {
@@ -401,7 +409,10 @@ public class Visitor {
     }
 
     public Constant visitStringConst(Token string) {
-        return new Constant(new ValueType.ArrayType(Integer8Ty), string.getContent());
+        Constant constant = new Constant(new ValueType.ArrayType(Integer8Ty),
+                string.getContent().substring(1, string.getContent().length() - 1));
+        constant.setString(true);
+        return constant;
     }
 
     public ArrayList<Symbol> visitFuncFParams(FuncFParams fps) throws Error {
@@ -463,14 +474,14 @@ public class Visitor {
                 return;
             }
             Branch out = new Branch("");
-            BasicBlock basicBlock = loopBlockStack.peek().getJudgeBlock();
+            BasicBlock basicBlock = loopBlockStack.peek().getUpdateBlock();
             out.addOperands(basicBlock);
             basicBlock.setLabeled(true);
             curBasicBlock.setTerminator(out);
         } else if (stmt.getType() == Stmt.StmtType.PRINTF) {
             visitPrintf(stmt);
         } else if (stmt.getType() == Stmt.StmtType.EXP) {
-            visitAddExp(((Exp) stmt.getStmts().get(0)).getAddExp());
+            Value value = visitAddExp(((Exp) stmt.getStmts().get(0)).getAddExp());
         } else if (stmt.getType() == Stmt.StmtType.BLOCK) {
             curDepth++;
             SymbolTable st = new SymbolTable(curTable, curDepth);
@@ -492,6 +503,11 @@ public class Visitor {
             Value value = visitLVal((LVal) stmt.getStmts().get(0), false);
             if (stmt.getType() == Stmt.StmtType.ASSIGN) {
                 Value res = visitAddExp(((Exp) stmt.getStmts().get(1)).getAddExp());
+                if (value.getTp().getDataType() == Integer32Ty) {
+                    res = zext(res);
+                } else {
+                    res = trunc(res);
+                }
                 Store store = new Store(new ValueType.Type(VoidTy), "");
                 store.addOperands(res);
                 store.addOperands(value);
@@ -500,8 +516,9 @@ public class Visitor {
                 Function getint = module.getDeclare("getint");
                 Call call = new Call(SlotTracker.slot(), getint);
                 curBasicBlock.appendInstr(call);
+                Value value1 = zext(call);
                 Store store = new Store(new ValueType.Type(VoidTy), "");
-                store.addOperands(call);
+                store.addOperands(value1);
                 store.addOperands(value);
                 curBasicBlock.appendInstr(store);
             } else if (stmt.getType() == Stmt.StmtType.GETCHAR) {
@@ -583,6 +600,7 @@ public class Visitor {
         BasicBlock updateBlock = null;
         if (stmt.getStmts().get(2) != null) {
             updateBlock = new BasicBlock("");
+            condBlock.setUpdateBlock(updateBlock);
         }
         // 初始化
         if (stmt.getStmts().get(0) != null) {
@@ -590,15 +608,19 @@ public class Visitor {
         }
         // 进入条件判断
         BasicBlock judgeBlock = new BasicBlock("");
+        Branch judge = new Branch("");
+        curBasicBlock.setTerminator(judge);
         if (stmt.getStmts().get(1) != null) {
-            Branch judge = new Branch("");
             judge.addOperands(judgeBlock);
-            curBasicBlock.setTerminator(judge);
             curBasicBlock = judgeBlock;
             judgeBlock.setName(SlotTracker.slot());
             visitCond((Cond) stmt.getStmts().get(1), condBlock, outBlock, null);
             curFunction.addBasicBlock(judgeBlock);
-            condBlock.setJudgeBlock(judgeBlock);
+            if (updateBlock == null) {
+                condBlock.setUpdateBlock(judgeBlock);
+            }
+        } else {
+            judge.addOperands(condBlock);
         }
         // 进入条件执行体
         condBlock.setName(SlotTracker.slot());
@@ -650,12 +672,11 @@ public class Visitor {
         for (int i = 1; i < strConst.length() - 1; i++) {
             char c = strConst.charAt(i);
             if (c == '%' && (strConst.charAt(i + 1) == 'd' || strConst.charAt(i + 1) == 'c')) {
-                String globalStr = "\"" + sb + "\"";
+                String globalStr = sb.toString();
                 sb.setLength(0);
-                if (globalStr.length() > 2) {
+                if (!globalStr.isEmpty()) {
                     ValueType.ArrayType arrayType = new ValueType.ArrayType(Integer8Ty);
                     arrayType.setDim(Transform.charList2string(globalStr).length() + 1);
-                    System.out.println(globalStr);
                     GlobalVariable var = new GlobalVariable(arrayType, SlotTracker.slotStr());
                     var.setUnnamed(true);
                     var.setConstant(true);
@@ -670,12 +691,11 @@ public class Visitor {
                 sb.append(c);
             }
         }
-        String globalStr = "\"" + sb + "\"";
+        String globalStr = sb.toString();
         sb.setLength(0);
-        if (globalStr.length() > 2) {
+        if (!globalStr.isEmpty()) {
             ValueType.ArrayType arrayType = new ValueType.ArrayType(Integer8Ty);
             arrayType.setDim(Transform.charList2string(globalStr).length() + 1);
-            System.out.println(globalStr);
             GlobalVariable var = new GlobalVariable(arrayType, SlotTracker.slotStr());
             var.setUnnamed(true);
             var.setConstant(true);
@@ -737,6 +757,14 @@ public class Visitor {
             }
             blocks.add(3, next);
             Value value = visitLAndExp(lOrExp.getLAndExps().get(i), blocks);
+            if (value.getTp().getDataType() != Integer1Ty) {
+                // 不为0则为真
+                Compare compare = new Compare(SlotTracker.slot(), Compare.CondType.NE);
+                compare.addOperands(value);
+                compare.addOperands(new Constant("0"));
+                curBasicBlock.appendInstr(compare);
+                value = compare;
+            }
             BasicBlock falseBlock = null;
             if (i == lOrExp.getLAndExps().size() - 1) {
                 if (blocks.get(2) == null) { // 如果没有else
@@ -917,11 +945,27 @@ public class Visitor {
     }
 
     public Value zext(Value value) {
+        if (value instanceof Constant) {
+            value.setTp(new ValueType.Type(Integer32Ty));
+        }
         if (value.getTp().getDataType() != Integer32Ty) {
             Zext zext = new Zext(new ValueType.Type(Integer32Ty), SlotTracker.slot());
             zext.addOperands(value);
             curBasicBlock.appendInstr(zext);
             return zext;
+        }
+        return value;
+    }
+
+    public Value trunc(Value value) {
+        if (value instanceof Constant) {
+            value.setTp(new ValueType.Type(Integer8Ty));
+        }
+        if (value.getTp().getDataType() != Integer8Ty) {
+            Trunc trunc = new Trunc(new ValueType.Type(Integer8Ty), SlotTracker.slot());
+            trunc.addOperands(value);
+            curBasicBlock.appendInstr(trunc);
+            return trunc;
         }
         return value;
     }
@@ -970,10 +1014,10 @@ public class Visitor {
                     errors.add(new Error("d", unaryExp.getLineno()));
                 } else if (func != null) {
                     call.setFuncRParams(visitFuncRParams(func.getFuncFParams(), unaryExp.getFuncRParams()));
-                    if (callFunc.isNotVoid()) {
-                        call.setName(SlotTracker.slot());
-                    }
                 }
+            }
+            if (callFunc.isNotVoid()) {
+                call.setName(SlotTracker.slot());
             }
             curBasicBlock.appendInstr(call);
             return call;
@@ -989,7 +1033,7 @@ public class Visitor {
             } else { // 取反操作就是与0比较是否相等
                 Value value1 = visitUnaryExp(unaryExp.getUnaryExp());
                 Value value2 = new Constant("0");
-                Compare compare = new Compare(SlotTracker.slot(), Compare.CondType.getOp("!="));
+                Compare compare = new Compare(SlotTracker.slot(), Compare.CondType.getOp("=="));
                 compare.addOperands(value1);
                 compare.addOperands(value2);
                 curBasicBlock.appendInstr(compare);

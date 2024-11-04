@@ -29,6 +29,14 @@ public class Value {
         return tp;
     }
 
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setTp(ValueType.Type tp) {
+        this.tp = tp;
+    }
+
     public String getFullName() {
         return id + name;
     }

@@ -2,4 +2,5 @@
 *.zip
 .idea
 src/*.zip
+src/*.s
 out

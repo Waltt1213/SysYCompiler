@@ -19,8 +19,8 @@ public class Character implements AstNode {
     }
 
     public String getChar() {
-        int ascii = Transform.str2int(charConst.getContent());
-        return "'" + String.valueOf(ascii) + "'";
+        int ascii = Transform.str2int(charConst.getContent().substring(1, charConst.getContent().length() - 1));
+        return String.valueOf(ascii);
     }
 
     @Override
