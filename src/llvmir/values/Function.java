@@ -24,6 +24,7 @@ public class Function extends Value {
         funcFParams = new ArrayList<>();
         this.isDefine = isDefine;
         isNotVoid = false;
+        isReturn = false;
         id = globalId;
     }
 
@@ -60,6 +61,13 @@ public class Function extends Value {
         BasicBlock basicBlock = basicBlocks.getLast();
         Return ret = new Return(null);
         basicBlock.appendInstr(ret);
+    }
+
+    public void setReturn(Value value) {
+        isReturn = true;
+        BasicBlock basicBlock = basicBlocks.getLast();
+        Return ret = new Return(null, value);
+        basicBlock.setTerminator(ret);
     }
 
     @Override
@@ -99,7 +107,7 @@ public class Function extends Value {
                     sb.append(", ");
                 }
             }
-            sb.append(") {");
+            sb.append(") {\n");
             for (BasicBlock basicBlock: basicBlocks) {
                 sb.append(basicBlock.toString());
             }

@@ -32,6 +32,7 @@ public class Visitor {
     private int curDepth;
     private Function curFunction;
     private BasicBlock curBasicBlock;
+    private final ArrayDeque<BasicBlock.ForBlock> loopBlockStack; // TODO： 设置成栈
     private final ArrayList<Error> errors;  // 错误处理
 
     private enum BlockType {
@@ -46,6 +47,7 @@ public class Visitor {
         symStack = new ArrayDeque<>();
         funcNameTable = new HashMap<>();
         blockStack = new ArrayDeque<>();
+        loopBlockStack = new ArrayDeque<>();
         this.errors = errors;
     }
 
@@ -175,6 +177,9 @@ public class Visitor {
         visitBlock(fd.getBlock());  // 构建函数内符号表
         if (!ft.toString().equals("VoidFunc") && !fd.getBlock().hasRet()) {
             errors.add(new Error("g", fd.getBlock().getLineno()));
+        }
+        if (!curFunction.isReturn()) {
+            curFunction.setReturn();
         }
     }
 
@@ -440,12 +445,28 @@ public class Visitor {
             visitIf(stmt);
         } else if (stmt.getType() == Stmt.StmtType.FOR) {
             visitFor(stmt);
-        } else if (stmt.getType() == Stmt.StmtType.BREAK
-                || stmt.getType() == Stmt.StmtType.CONTINUE) {
+        } else if (stmt.getType() == Stmt.StmtType.BREAK) {
+            BlockType bt = blockStack.peek();
+            if (bt != BlockType.forBlock) { // TODO: curLoop == null
+                errors.add(new Error("m", stmt.getLineno()));
+                return;
+            }
+            Branch out = new Branch("");
+            BasicBlock basicBlock = loopBlockStack.peek().getOutBlock();
+            out.addOperands(basicBlock);
+            basicBlock.setLabeled(true);
+            curBasicBlock.setTerminator(out);
+        } else if (stmt.getType() == Stmt.StmtType.CONTINUE) {
             BlockType bt = blockStack.peek();
             if (bt != BlockType.forBlock) {
                 errors.add(new Error("m", stmt.getLineno()));
+                return;
             }
+            Branch out = new Branch("");
+            BasicBlock basicBlock = loopBlockStack.peek().getJudgeBlock();
+            out.addOperands(basicBlock);
+            basicBlock.setLabeled(true);
+            curBasicBlock.setTerminator(out);
         } else if (stmt.getType() == Stmt.StmtType.PRINTF) {
             visitPrintf(stmt);
         } else if (stmt.getType() == Stmt.StmtType.EXP) {
@@ -505,9 +526,11 @@ public class Visitor {
         if (!stmt.getStmts().isEmpty()) {
             Value ret = visitAddExp(((Exp) stmt.getStmts().get(0)).getAddExp());
             curFunction.setNotVoid(true);
-            curBasicBlock.appendInstr(new Return(null, ret));
+            // curBasicBlock.appendInstr(new Return(null, ret));
+            curFunction.setReturn(ret);
         } else {
-            curBasicBlock.appendInstr(new Return(null));
+            // curBasicBlock.appendInstr(new Return(null));
+            curFunction.setReturn();
         }
     }
 
@@ -527,7 +550,8 @@ public class Visitor {
         visitStmt((Stmt) stmt.getStmts().get(1));
         Branch out = new Branch("");
         out.addOperands(endBlock);
-        curBasicBlock.appendInstr(out);
+        curBasicBlock.setTerminator(out);
+        endBlock.setLabeled(true);
         // 进入else
         if (stmt.getStmts().size() > 2 && elseBlock != null) {
             elseBlock.setName(SlotTracker.slot());
@@ -536,7 +560,8 @@ public class Visitor {
             visitStmt((Stmt) stmt.getStmts().get(2));
             Branch out2 = new Branch("");
             out2.addOperands(endBlock);
-            curBasicBlock.appendInstr(out2);
+            curBasicBlock.setTerminator(out2);
+            endBlock.setLabeled(true);
         }
         endBlock.setName(SlotTracker.slot());
         curBasicBlock = endBlock;
@@ -553,47 +578,60 @@ public class Visitor {
 
     public void visitFor(Stmt stmt) {
         blockStack.push(BlockType.forBlock);
-        BasicBlock judgeBlock = new BasicBlock("");
-        BasicBlock condBlock = new BasicBlock("");
-        BasicBlock endBlock = new BasicBlock("");
+        BasicBlock outBlock = new BasicBlock("");
+        BasicBlock.ForBlock condBlock = new BasicBlock.ForBlock("", outBlock);
+        BasicBlock updateBlock = null;
+        if (stmt.getStmts().get(2) != null) {
+            updateBlock = new BasicBlock("");
+        }
         // 初始化
         if (stmt.getStmts().get(0) != null) {
             visitForStmt((ForStmt) stmt.getStmts().get(0)); // 执行第一个ForStmt
         }
         // 进入条件判断
-        curBasicBlock = judgeBlock;
+        BasicBlock judgeBlock = new BasicBlock("");
         if (stmt.getStmts().get(1) != null) {
+            Branch judge = new Branch("");
+            judge.addOperands(judgeBlock);
+            curBasicBlock.setTerminator(judge);
+            curBasicBlock = judgeBlock;
             judgeBlock.setName(SlotTracker.slot());
-            visitCond((Cond) stmt.getStmts().get(1), condBlock, endBlock, null);
+            visitCond((Cond) stmt.getStmts().get(1), condBlock, outBlock, null);
             curFunction.addBasicBlock(judgeBlock);
+            condBlock.setJudgeBlock(judgeBlock);
         }
         // 进入条件执行体
         condBlock.setName(SlotTracker.slot());
         curBasicBlock = condBlock;
         curFunction.addBasicBlock(condBlock);
+        loopBlockStack.push(condBlock);
         visitStmt((Stmt) stmt.getStmts().get(3));
-        if (stmt.getStmts().get(2) != null) {
-            // 跳转到continueBlock
-            BasicBlock continueBlock = new BasicBlock(SlotTracker.slot());
+        // 跳转到continueBlock
+        if (updateBlock != null) {
+            updateBlock.setLabeled(true);
+            updateBlock.setName(SlotTracker.slot());
             Branch join = new Branch("");
-            join.addOperands(continueBlock);
-            curBasicBlock.appendInstr(join);
-            curFunction.addBasicBlock(continueBlock);
-            curBasicBlock = continueBlock;
-            visitForStmt((ForStmt) stmt.getStmts().get(0)); // 执行第一个ForStmt
+            join.addOperands(updateBlock);
+            curBasicBlock.setTerminator(join);
+            curFunction.addBasicBlock(updateBlock);
+            curBasicBlock = updateBlock;
+            visitForStmt((ForStmt) stmt.getStmts().get(2)); // 执行第一个ForStmt
         }
         // 继续跳转到判断语句或执行体
         Branch next = new Branch("");
         if (stmt.getStmts().get(1) != null) {
             next.addOperands(judgeBlock);
+            judgeBlock.setLabeled(true);
         } else {
             next.addOperands(condBlock);
+            condBlock.setLabeled(true);
         }
-        curBasicBlock.appendInstr(next);
+        curBasicBlock.setTerminator(next);
         // 进入结束块
-        endBlock.setName(SlotTracker.slot());
-        curBasicBlock = endBlock;
-        curFunction.addBasicBlock(endBlock);
+        outBlock.setName(SlotTracker.slot());
+        curBasicBlock = outBlock;
+        curFunction.addBasicBlock(outBlock);
+        loopBlockStack.pop();
         blockStack.pop();
     }
 
@@ -717,7 +755,11 @@ public class Visitor {
                 branch.addOperands(value);
                 branch.addOperands(blocks.get(0));
                 branch.addOperands(falseBlock);
-                curBasicBlock.appendInstr(branch);
+                curBasicBlock.setTerminator(branch);
+                if (falseBlock != null) {
+                    falseBlock.setLabeled(true);
+                }
+                blocks.get(0).setLabeled(true);
             }
             curBasicBlock = falseBlock;
         }
@@ -747,12 +789,16 @@ public class Visitor {
             // 如果后面无或判断，则跳到else或者end
             if (blocks.get(3) != null) {
                 branch.addOperands(blocks.get(3));  // else judgeBlock
+                blocks.get(3).setLabeled(true);
             } else if (blocks.get(2) != null) {
                 branch.addOperands(blocks.get(2));  // else elseblock
+                blocks.get(2).setLabeled(true);
             } else {
                 branch.addOperands(blocks.get(1));  // else endblock
+                blocks.get(1).setLabeled(true);
             }
-            curBasicBlock.appendInstr(branch);
+            curBasicBlock.setTerminator(branch);
+            tureBlock.setLabeled(true);
             if (i != lAndExp.getEqExps().size() - 1) {
                 curBasicBlock = tureBlock;
             }

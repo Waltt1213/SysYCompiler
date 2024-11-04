@@ -2,6 +2,7 @@ package llvmir.values;
 
 import llvmir.Value;
 import llvmir.ValueType;
+import llvmir.values.instr.Branch;
 import llvmir.values.instr.Instruction;
 
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ public class BasicBlock extends Value {
     private final LinkedList<Instruction> instructions;
     private ArrayList<Label> preds;
     private Function parent;
+    private boolean isLabeled;
     private boolean isTerminator;
 
     public BasicBlock(String name) {
@@ -27,12 +29,12 @@ public class BasicBlock extends Value {
         return parent;
     }
 
-    public void setTerminator(boolean terminator) {
-        isTerminator = terminator;
+    public void setLabeled(boolean labeled) {
+        isLabeled = labeled;
     }
 
-    public boolean isTerminator() {
-        return isTerminator;
+    public boolean isLabeled() {
+        return isLabeled;
     }
 
     public void setName(String name) {
@@ -40,11 +42,22 @@ public class BasicBlock extends Value {
     }
 
     public void appendInstr(Instruction instr) {
-        instructions.add(instr);
+        if (!isTerminator) {
+            instructions.add(instr);
+        }
     }
 
     public void addPred(Label label) {
         preds.add(label);
+    }
+
+    public boolean isTerminator() {
+        return isTerminator;
+    }
+
+    public void setTerminator(Instruction branch) {
+        appendInstr(branch);
+        isTerminator = true;
     }
 
     @Override
@@ -55,12 +68,42 @@ public class BasicBlock extends Value {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("\n");
-        sb.append(getName()).append(": ");
-        sb.append("\n");
+        if (isLabeled) {
+            sb.append(getName()).append(": ");
+            sb.append("\n");
+        }
         for (Instruction instr: instructions) {
             sb.append("\t").append(instr.toString()).append("\n");
         }
         return sb.toString();
+    }
+
+    public static class ForBlock extends BasicBlock {
+        private BasicBlock outBlock;
+        private BasicBlock judgeBlock;
+
+        public ForBlock(String name, BasicBlock outBlock) {
+            super(name);
+            this.outBlock = outBlock;
+        }
+
+        public void setOutBlock(BasicBlock outBlock) {
+            this.outBlock = outBlock;
+        }
+
+        public void setJudgeBlock(BasicBlock judgeBlock) {
+            this.judgeBlock = judgeBlock;
+        }
+
+        public BasicBlock getOutBlock() {
+            return outBlock;
+        }
+
+        public BasicBlock getJudgeBlock() {
+            if (judgeBlock == null) {
+                return this;
+            }
+            return judgeBlock;
+        }
     }
 }
