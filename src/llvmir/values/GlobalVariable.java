@@ -46,7 +46,18 @@ public class GlobalVariable extends Value {
     }
 
     public Value getInit(int bis) {
-        return initVal.get(bis);
+        if (!initVal.isEmpty() && ((Constant) initVal.get(0)).isString()) {
+            String content = initVal.get(0).getName();
+            if (bis < content.length()) {
+                int init = Transform.str2int(String.valueOf(content.charAt(bis)));
+                return new Constant(getElementType(), String.valueOf(init));
+            }
+            return new Constant(getElementType(),"0");
+        }
+        if (bis < initVal.size()) {
+            return initVal.get(bis);
+        }
+        return new Constant(getElementType(),"0");
     }
 
     public ValueType.Type getElementType() {

@@ -56,7 +56,7 @@ public class Visitor {
         tableStack.push(curTable);
         symbolTables.add(curTable);
         curFunction = null;
-        curBasicBlock = new BasicBlock("");
+        curBasicBlock = null;
         buildDeclare();
         visitCompUnit(root);
         tableStack.clear();
@@ -1066,8 +1066,16 @@ public class Visitor {
             return new Value(new ValueType.Type(Integer32Ty), "null");
         }
         Value value = symbol.getValue();
-
-        if (lVal.isArrayElement()) { // 传递数组元素指针
+        // 如果是左值
+        if (value instanceof GlobalVariable && ((GlobalVariable) value).isConstant()) {
+            GlobalVariable globalVar = (GlobalVariable) value;
+            if (!globalVar.isArray()) {
+                value =  globalVar.getInitVal().get(0);
+            } else if (globalVar.isArray() && lVal.isArrayElement()) {
+                int bis = Integer.parseInt(visitAddExp(lVal.getExp().getAddExp()).getName());
+                value =  globalVar.getInit(bis);
+            }
+        } else if (lVal.isArrayElement()) { // 传递数组元素指针
             Value index = visitAddExp(lVal.getExp().getAddExp());
             if (value.getTp().getActType() instanceof ValueType.PointerType) {
                 Load load = new Load(value.getTp().getActType(), SlotTracker.slot());
@@ -1098,14 +1106,8 @@ public class Visitor {
             return value;
         }
         // 如果是全局变量
-        if (value instanceof GlobalVariable) {
-            GlobalVariable globalVar = (GlobalVariable) value;
-            if (globalVar.isConstant() && !globalVar.isArray()) {
-                return globalVar.getInitVal().get(0);
-            } else if (globalVar.isArray() && lVal.isArrayElement()) {
-                int bis = Integer.parseInt(visitAddExp(lVal.getExp().getAddExp()).getName());
-                return globalVar.getInit(bis);
-            }
+        if (value instanceof GlobalVariable && ((GlobalVariable) value).isConstant()) {
+            return value;
         }
         // 等号右边的左值，需要返回的是load下来的值
         if (value instanceof GlobalVariable || value instanceof Alloca || value instanceof GetElementPtr) {
