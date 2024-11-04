@@ -1066,16 +1066,7 @@ public class Visitor {
             return new Value(new ValueType.Type(Integer32Ty), "null");
         }
         Value value = symbol.getValue();
-        // 如果是全局变量
-        if (value instanceof GlobalVariable) {
-            GlobalVariable globalVar = (GlobalVariable) value;
-            if (globalVar.isConstant() && !globalVar.isArray()) {
-                return globalVar.getInitVal().get(0);
-            } else if (globalVar.isArray() && lVal.isArrayElement()) {
-                int bis = Integer.parseInt(visitAddExp(lVal.getExp().getAddExp()).getName());
-                return globalVar.getInit(bis);
-            }
-        }
+
         if (lVal.isArrayElement()) { // 传递数组元素指针
             Value index = visitAddExp(lVal.getExp().getAddExp());
             if (value.getTp().getActType() instanceof ValueType.PointerType) {
@@ -1084,13 +1075,13 @@ public class Visitor {
                 curBasicBlock.appendInstr(load);
                 value = load;
             }
-            String bis = index.getName();
+            // String bis = index.getName();
             GetElementPtr getElementPtr = new GetElementPtr(value.getTp(), SlotTracker.slot());
             getElementPtr.addOperands(value);
             if (value.getTp().getActType() instanceof ValueType.ArrayType) {
                 getElementPtr.addOperands(new Constant("0"));
             }
-            getElementPtr.addOperands(new Constant(bis));
+            getElementPtr.addOperands(index); // TODO: 有变化 原本为bis
             curBasicBlock.appendInstr(getElementPtr);
             value = getElementPtr;
         } else if (value.getTp() instanceof ValueType.PointerType
@@ -1105,6 +1096,16 @@ public class Visitor {
         }
         if (!isOperand) { // 等号左边的左值，需要返回的是指针
             return value;
+        }
+        // 如果是全局变量
+        if (value instanceof GlobalVariable) {
+            GlobalVariable globalVar = (GlobalVariable) value;
+            if (globalVar.isConstant() && !globalVar.isArray()) {
+                return globalVar.getInitVal().get(0);
+            } else if (globalVar.isArray() && lVal.isArrayElement()) {
+                int bis = Integer.parseInt(visitAddExp(lVal.getExp().getAddExp()).getName());
+                return globalVar.getInit(bis);
+            }
         }
         // 等号右边的左值，需要返回的是load下来的值
         if (value instanceof GlobalVariable || value instanceof Alloca || value instanceof GetElementPtr) {
