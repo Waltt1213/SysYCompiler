@@ -45,6 +45,10 @@ public class GlobalVariable extends Value {
         initVal.add(value);
     }
 
+    public Value getInit(int bis) {
+        return initVal.get(bis);
+    }
+
     public ValueType.Type getElementType() {
         return new ValueType.Type(tp.getDataType());
     }
@@ -60,6 +64,7 @@ public class GlobalVariable extends Value {
                 && initVal.get(0).getTp().getDataType() == ValueType.DataType.Integer8Ty) {
             ValueType.ArrayType type = (ValueType.ArrayType) tp;
             String s = Transform.charList2string(initVal.get(0).getName());
+            // System.out.println(s);
             sb.append(" c\"").append(Transform.str2charList(s));
             for (int i = s.length(); i < type.getDim(); i++) {
                 sb.append("\\00");

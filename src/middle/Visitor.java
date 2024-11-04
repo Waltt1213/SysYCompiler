@@ -56,7 +56,7 @@ public class Visitor {
         tableStack.push(curTable);
         symbolTables.add(curTable);
         curFunction = null;
-        curBasicBlock = null;
+        curBasicBlock = new BasicBlock("");
         buildDeclare();
         visitCompUnit(root);
         tableStack.clear();
@@ -673,6 +673,7 @@ public class Visitor {
             char c = strConst.charAt(i);
             if (c == '%' && (strConst.charAt(i + 1) == 'd' || strConst.charAt(i + 1) == 'c')) {
                 String globalStr = sb.toString();
+                // System.out.println(globalStr);
                 sb.setLength(0);
                 if (!globalStr.isEmpty()) {
                     ValueType.ArrayType arrayType = new ValueType.ArrayType(Integer8Ty);
@@ -692,6 +693,7 @@ public class Visitor {
             }
         }
         String globalStr = sb.toString();
+        // System.out.println(globalStr);
         sb.setLength(0);
         if (!globalStr.isEmpty()) {
             ValueType.ArrayType arrayType = new ValueType.ArrayType(Integer8Ty);
@@ -1064,6 +1066,16 @@ public class Visitor {
             return new Value(new ValueType.Type(Integer32Ty), "null");
         }
         Value value = symbol.getValue();
+        // 如果是全局变量
+        if (value instanceof GlobalVariable) {
+            GlobalVariable globalVar = (GlobalVariable) value;
+            if (globalVar.isConstant() && !globalVar.isArray()) {
+                return globalVar.getInitVal().get(0);
+            } else if (globalVar.isArray() && lVal.isArrayElement()) {
+                int bis = Integer.parseInt(visitAddExp(lVal.getExp().getAddExp()).getName());
+                return globalVar.getInit(bis);
+            }
+        }
         if (lVal.isArrayElement()) { // 传递数组元素指针
             Value index = visitAddExp(lVal.getExp().getAddExp());
             if (value.getTp().getActType() instanceof ValueType.PointerType) {
@@ -1095,12 +1107,6 @@ public class Visitor {
             return value;
         }
         // 等号右边的左值，需要返回的是load下来的值
-        if (value instanceof GlobalVariable) {
-            GlobalVariable globalVar = (GlobalVariable) value;
-            if (globalVar.isConstant() && !globalVar.isArray()) {
-                return globalVar.getInitVal().get(0);
-            }
-        }
         if (value instanceof GlobalVariable || value instanceof Alloca || value instanceof GetElementPtr) {
             Load load = new Load(value.getTp().getActType(), SlotTracker.slot());
             load.addOperands(value);

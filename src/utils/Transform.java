@@ -76,7 +76,6 @@ public class Transform {
         for (int i = 0; i < str.length(); i++) {
             if (str.charAt(i) == '\n') {
                 sb.append("\\0A");
-                i++;
             } else {
                 sb.append(str.charAt(i));
             }
