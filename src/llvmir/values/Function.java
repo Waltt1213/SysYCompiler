@@ -56,16 +56,14 @@ public class Function extends Value {
         return isReturn;
     }
 
-    public void setReturn() {
+    public void setReturn(BasicBlock basicBlock) {
         isReturn = true;
-        BasicBlock basicBlock = basicBlocks.getLast();
         Return ret = new Return(null);
-        basicBlock.appendInstr(ret);
+        basicBlock.setTerminator(ret);
     }
 
-    public void setReturn(Value value) {
+    public void setReturn(Value value, BasicBlock basicBlock) {
         isReturn = true;
-        BasicBlock basicBlock = basicBlocks.getLast();
         Return ret = new Return(null, value);
         basicBlock.setTerminator(ret);
     }

@@ -3,6 +3,7 @@ package llvmir.values;
 import llvmir.Value;
 import llvmir.ValueType;
 import llvmir.values.instr.Instruction;
+import middle.SlotTracker;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -37,11 +38,14 @@ public class BasicBlock extends Value {
     }
 
     public void setName(String name) {
-        this.name = name;
+        super.setName(name);
     }
 
-    public void appendInstr(Instruction instr) {
+    public void appendInstr(Instruction instr, boolean setName) {
         if (!isTerminator) {
+            if (setName) {
+                instr.setName(SlotTracker.slot());
+            }
             instructions.add(instr);
         }
     }
@@ -55,7 +59,7 @@ public class BasicBlock extends Value {
     }
 
     public void setTerminator(Instruction branch) {
-        appendInstr(branch);
+        appendInstr(branch, false);
         isTerminator = true;
     }
 

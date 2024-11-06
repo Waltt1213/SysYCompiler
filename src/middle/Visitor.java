@@ -179,7 +179,7 @@ public class Visitor {
             errors.add(new Error("g", fd.getBlock().getLineno()));
         }
         if (!curFunction.isReturn()) {
-            curFunction.setReturn();
+            curFunction.setReturn(curBasicBlock);
         }
     }
 
@@ -261,8 +261,8 @@ public class Visitor {
             value.setConstant(true);
         } else {
             // 局部变量先alloca
-            Alloca alloca = new Alloca(type, SlotTracker.slot());
-            curBasicBlock.appendInstr(alloca);
+            Alloca alloca = new Alloca(type, "");
+            curBasicBlock.appendInstr(alloca, true);
             // 再store初值
             ArrayList<Value> constants = visitConstInitVal(constDef.getConstInitVal());
             buildLocalInit(alloca, constants);
@@ -279,7 +279,7 @@ public class Visitor {
                 ArrayList<Integer> str2int = Transform.str2intList(s);
                 Value prePtr = alloca;
                 for (int i = 0;  i < str2int.size(); i++) {
-                    GetElementPtr getElementPtr = new GetElementPtr(prePtr.getTp(), SlotTracker.slot());
+                    GetElementPtr getElementPtr = new GetElementPtr(prePtr.getTp(), "");
                     getElementPtr.addOperands(prePtr);
                     if (i == 0) {
                         getElementPtr.addOperands(new Constant("0"));
@@ -287,11 +287,11 @@ public class Visitor {
                     } else {
                         getElementPtr.addOperands(new Constant("1"));
                     }
-                    curBasicBlock.appendInstr(getElementPtr);
+                    curBasicBlock.appendInstr(getElementPtr, true);
                     Store store = new Store(new ValueType.Type(VoidTy), "");
                     store.addOperands(new Constant(new ValueType.Type(Integer8Ty), String.valueOf(str2int.get(i))));
                     store.addOperands(getElementPtr);
-                    curBasicBlock.appendInstr(store);
+                    curBasicBlock.appendInstr(store, false);
                     prePtr = getElementPtr;
                 }
             } else {
@@ -300,7 +300,7 @@ public class Visitor {
         } else {
             Value prePtr = alloca;
             for (int i = 0;  i < inits.size(); i++) {
-                GetElementPtr getElementPtr = new GetElementPtr(prePtr.getTp(), SlotTracker.slot());
+                GetElementPtr getElementPtr = new GetElementPtr(prePtr.getTp(),"");
                 getElementPtr.addOperands(prePtr);
                 if (i == 0) {
                     getElementPtr.addOperands(new Constant("0"));
@@ -308,7 +308,7 @@ public class Visitor {
                 } else {
                     getElementPtr.addOperands(new Constant("1"));
                 }
-                curBasicBlock.appendInstr(getElementPtr);
+                curBasicBlock.appendInstr(getElementPtr, true);
                 buildInit(getElementPtr, inits.get(i));
                 prePtr = getElementPtr;
             }
@@ -327,7 +327,7 @@ public class Visitor {
         }
         store.addOperands(res);
         store.addOperands(value1);
-        curBasicBlock.appendInstr(store);
+        curBasicBlock.appendInstr(store, false);
     }
 
     public Constant visitConstExp(ConstExp constExp) {
@@ -382,8 +382,8 @@ public class Visitor {
             var.setValue(globalVariable);
         } else {
             // 局部变量先alloca
-            Alloca alloca = new Alloca(type, SlotTracker.slot());
-            curBasicBlock.appendInstr(alloca);
+            Alloca alloca = new Alloca(type, "");
+            curBasicBlock.appendInstr(alloca, true);
             // 再store初值
             if (varDef.hasInitVal()) {
                 ArrayList<Value> constants = visitInitVal(varDef.getInitVal());
@@ -438,12 +438,12 @@ public class Visitor {
 
     public void buildParamInit(ArrayList<Symbol> paramsSym) {
         for (Argument argument: curFunction.getFuncFParams()) {
-            Alloca alloca = new Alloca(argument.getTp(), SlotTracker.slot());
-            curBasicBlock.appendInstr(alloca);
+            Alloca alloca = new Alloca(argument.getTp(), "");
+            curBasicBlock.appendInstr(alloca, true);
             Store store = new Store(new ValueType.Type(VoidTy), "");
             store.addOperands(argument);
             store.addOperands(alloca);
-            curBasicBlock.appendInstr(store);
+            curBasicBlock.appendInstr(store, false);
             Symbol symbol = paramsSym.remove(0);
             symbol.setValue(alloca);
         }
@@ -511,27 +511,27 @@ public class Visitor {
                 Store store = new Store(new ValueType.Type(VoidTy), "");
                 store.addOperands(res);
                 store.addOperands(value);
-                curBasicBlock.appendInstr(store);
+                curBasicBlock.appendInstr(store, false);
             } else if (stmt.getType() == Stmt.StmtType.GETINT) {
                 Function getint = module.getDeclare("getint");
-                Call call = new Call(SlotTracker.slot(), getint);
-                curBasicBlock.appendInstr(call);
+                Call call = new Call("", getint);
+                curBasicBlock.appendInstr(call, true);
                 Value value1 = zext(call);
                 Store store = new Store(new ValueType.Type(VoidTy), "");
                 store.addOperands(value1);
                 store.addOperands(value);
-                curBasicBlock.appendInstr(store);
+                curBasicBlock.appendInstr(store, false);
             } else if (stmt.getType() == Stmt.StmtType.GETCHAR) {
                 Function getint = module.getDeclare("getchar");
-                Call call = new Call(SlotTracker.slot(), getint);
-                curBasicBlock.appendInstr(call);
-                Trunc trunc = new Trunc(new ValueType.Type(Integer8Ty), SlotTracker.slot());
+                Call call = new Call("", getint);
+                curBasicBlock.appendInstr(call, true);
+                Trunc trunc = new Trunc(new ValueType.Type(Integer8Ty), "");
                 trunc.addOperands(call);
-                curBasicBlock.appendInstr(trunc);
+                curBasicBlock.appendInstr(trunc, true);
                 Store store = new Store(new ValueType.Type(VoidTy), "");
                 store.addOperands(trunc);
                 store.addOperands(value);
-                curBasicBlock.appendInstr(store);
+                curBasicBlock.appendInstr(store, false);
             }
         }
     }
@@ -544,10 +544,17 @@ public class Visitor {
             Value ret = visitAddExp(((Exp) stmt.getStmts().get(0)).getAddExp());
             curFunction.setNotVoid(true);
             // curBasicBlock.appendInstr(new Return(null, ret));
-            curFunction.setReturn(ret);
+            Value res = ret;
+            if (ret.getTp().getDataType().compareTo(curFunction.getTp().getDataType()) > 0) {
+                // 需要trunc
+                res = trunc(ret);
+            } else if (ret.getTp().getDataType().compareTo(curFunction.getTp().getDataType()) < 0) {
+                res = zext(ret);
+            }
+            curFunction.setReturn(res, curBasicBlock);
         } else {
             // curBasicBlock.appendInstr(new Return(null));
-            curFunction.setReturn();
+            curFunction.setReturn(curBasicBlock);
         }
     }
 
@@ -613,9 +620,9 @@ public class Visitor {
         if (stmt.getStmts().get(1) != null) {
             judge.addOperands(judgeBlock);
             curBasicBlock = judgeBlock;
+            curFunction.addBasicBlock(judgeBlock);
             judgeBlock.setName(SlotTracker.slot());
             visitCond((Cond) stmt.getStmts().get(1), condBlock, outBlock, null);
-            curFunction.addBasicBlock(judgeBlock);
             if (updateBlock == null) {
                 condBlock.setUpdateBlock(judgeBlock);
             }
@@ -711,7 +718,7 @@ public class Visitor {
         if (c == 's') {
             Function putstr = module.getDeclare("putstr");
             Call call = new Call(putstr);
-            curBasicBlock.appendInstr(call);
+            curBasicBlock.appendInstr(call, false);
             GetElementPtr getElementPtr = new GetElementPtr(var.getTp(), null);
             getElementPtr.addOperands(var);
             getElementPtr.addOperands(new Constant(new ValueType.Type(Integer64Ty), "0"));
@@ -722,13 +729,13 @@ public class Visitor {
             Call call = new Call(putch);
             Value newVar = zext(var);
             call.addFuncRParam(newVar);
-            curBasicBlock.appendInstr(call);
+            curBasicBlock.appendInstr(call, false);
         } else {
             Function putint = module.getDeclare("putint");
             Call call = new Call(putint);
             Value newVar = zext(var);
             call.addFuncRParam(newVar);
-            curBasicBlock.appendInstr(call);
+            curBasicBlock.appendInstr(call, false);
         }
     }
 
@@ -746,7 +753,7 @@ public class Visitor {
         Store store = new Store(new ValueType.Type(VoidTy), "");
         store.addOperands(res);
         store.addOperands(value);
-        curBasicBlock.appendInstr(store);
+        curBasicBlock.appendInstr(store, false);
     }
 
     public void visitLOrExp(LOrExp lOrExp, ArrayList<BasicBlock> blocks) {
@@ -761,10 +768,10 @@ public class Visitor {
             Value value = visitLAndExp(lOrExp.getLAndExps().get(i), blocks);
             if (value.getTp().getDataType() != Integer1Ty) {
                 // 不为0则为真
-                Compare compare = new Compare(SlotTracker.slot(), Compare.CondType.NE);
+                Compare compare = new Compare("", Compare.CondType.NE);
                 compare.addOperands(value);
                 compare.addOperands(new Constant("0"));
-                curBasicBlock.appendInstr(compare);
+                curBasicBlock.appendInstr(compare, true);
                 value = compare;
             }
             BasicBlock falseBlock = null;
@@ -802,6 +809,14 @@ public class Visitor {
         Value value = null;
         for (int i = 0; i < lAndExp.getEqExps().size(); i++) {
             value = visitEqExp(lAndExp.getEqExps().get(i));
+            if (value.getTp().getDataType() != Integer1Ty) {
+                // 不为0则为真
+                Compare compare = new Compare("", Compare.CondType.NE);
+                compare.addOperands(value);
+                compare.addOperands(new Constant("0"));
+                curBasicBlock.appendInstr(compare, true);
+                value = compare;
+            }
             BasicBlock tureBlock = null;
             // 如果后面没有与判断，如果为真则跳转到ifBlock
             // 如果后面还有判断，则跳转到下一个基本块中判断
@@ -873,10 +888,10 @@ public class Visitor {
         } else {
             Value zextValue1 = zext(value1);
             Value zextValue2 = zext(value2);
-            Compare compare = new Compare(SlotTracker.slot(), type);
+            Compare compare = new Compare("", type);
             compare.addOperands(zextValue1);
             compare.addOperands(zextValue2);
-            curBasicBlock.appendInstr(compare);
+            curBasicBlock.appendInstr(compare, true);
             return compare;
         }
     }
@@ -916,10 +931,10 @@ public class Visitor {
         } else {
             Value zextValue1 = zext(value1);
             Value zextValue2 = zext(value2);
-            BinaryOperator binOp = new BinaryOperator(new ValueType.Type(Integer32Ty), type, SlotTracker.slot());
+            BinaryOperator binOp = new BinaryOperator(new ValueType.Type(Integer32Ty), type, "");
             binOp.addOperands(zextValue1);
             binOp.addOperands(zextValue2);
-            curBasicBlock.appendInstr(binOp);
+            curBasicBlock.appendInstr(binOp, true);
             return binOp;
         }
     }
@@ -951,9 +966,9 @@ public class Visitor {
             value.setTp(new ValueType.Type(Integer32Ty));
         }
         if (value.getTp().getDataType() != Integer32Ty) {
-            Zext zext = new Zext(new ValueType.Type(Integer32Ty), SlotTracker.slot());
+            Zext zext = new Zext(new ValueType.Type(Integer32Ty), "");
             zext.addOperands(value);
-            curBasicBlock.appendInstr(zext);
+            curBasicBlock.appendInstr(zext, true);
             return zext;
         }
         return value;
@@ -964,9 +979,9 @@ public class Visitor {
             value.setTp(new ValueType.Type(Integer8Ty));
         }
         if (value.getTp().getDataType() != Integer8Ty) {
-            Trunc trunc = new Trunc(new ValueType.Type(Integer8Ty), SlotTracker.slot());
+            Trunc trunc = new Trunc(new ValueType.Type(Integer8Ty), "");
             trunc.addOperands(value);
-            curBasicBlock.appendInstr(trunc);
+            curBasicBlock.appendInstr(trunc, true);
             return trunc;
         }
         return value;
@@ -1018,10 +1033,7 @@ public class Visitor {
                     call.setFuncRParams(visitFuncRParams(func.getFuncFParams(), unaryExp.getFuncRParams()));
                 }
             }
-            if (callFunc.isNotVoid()) {
-                call.setName(SlotTracker.slot());
-            }
-            curBasicBlock.appendInstr(call);
+            curBasicBlock.appendInstr(call, callFunc.isNotVoid());
             return call;
         } else if (unaryExp.isPrimaryExp()) {
             return visitPrimaryExp(unaryExp.getPrimaryExp());
@@ -1035,10 +1047,10 @@ public class Visitor {
             } else { // 取反操作就是与0比较是否相等
                 Value value1 = visitUnaryExp(unaryExp.getUnaryExp());
                 Value value2 = new Constant("0");
-                Compare compare = new Compare(SlotTracker.slot(), Compare.CondType.getOp("=="));
+                Compare compare = new Compare("", Compare.CondType.getOp("=="));
                 compare.addOperands(value1);
                 compare.addOperands(value2);
-                curBasicBlock.appendInstr(compare);
+                curBasicBlock.appendInstr(compare, true);
                 return compare;
             }
         }
@@ -1078,27 +1090,27 @@ public class Visitor {
         } else if (lVal.isArrayElement()) { // 传递数组元素指针
             Value index = visitAddExp(lVal.getExp().getAddExp());
             if (value.getTp().getActType() instanceof ValueType.PointerType) {
-                Load load = new Load(value.getTp().getActType(), SlotTracker.slot());
+                Load load = new Load(value.getTp().getActType(), "");
                 load.addOperands(value);
-                curBasicBlock.appendInstr(load);
+                curBasicBlock.appendInstr(load, true);
                 value = load;
             }
             // String bis = index.getName();
-            GetElementPtr getElementPtr = new GetElementPtr(value.getTp(), SlotTracker.slot());
+            GetElementPtr getElementPtr = new GetElementPtr(value.getTp(), "");
             getElementPtr.addOperands(value);
             if (value.getTp().getActType() instanceof ValueType.ArrayType) {
                 getElementPtr.addOperands(new Constant("0"));
             }
             getElementPtr.addOperands(index); // TODO: 有变化 原本为bis
-            curBasicBlock.appendInstr(getElementPtr);
+            curBasicBlock.appendInstr(getElementPtr, true);
             value = getElementPtr;
         } else if (value.getTp() instanceof ValueType.PointerType
                 && value.getTp().getActType() instanceof ValueType.ArrayType) { // 例如传递数组指针
-            GetElementPtr getElementPtr = new GetElementPtr(value.getTp(), SlotTracker.slot());
+            GetElementPtr getElementPtr = new GetElementPtr(value.getTp(), "");
             getElementPtr.addOperands(value);
             getElementPtr.addOperands(new Constant("0"));
             getElementPtr.addOperands(new Constant("0"));
-            curBasicBlock.appendInstr(getElementPtr);
+            curBasicBlock.appendInstr(getElementPtr, true);
             value = getElementPtr;
             return value;
         }
@@ -1111,9 +1123,9 @@ public class Visitor {
         }
         // 等号右边的左值，需要返回的是load下来的值
         if (value instanceof GlobalVariable || value instanceof Alloca || value instanceof GetElementPtr) {
-            Load load = new Load(value.getTp().getActType(), SlotTracker.slot());
+            Load load = new Load(value.getTp().getActType(), "");
             load.addOperands(value);
-            curBasicBlock.appendInstr(load);
+            curBasicBlock.appendInstr(load, true);
             return load;
         }
         return value;
