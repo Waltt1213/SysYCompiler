@@ -750,6 +750,11 @@ public class Visitor {
         }
         Value value = visitLVal(forStmt.getLval(), false);
         Value res = visitAddExp(forStmt.getExp().getAddExp());
+        if (value.getTp().getDataType() == Integer32Ty) {
+            res = zext(res);
+        } else {
+            res = trunc(res);
+        }
         Store store = new Store(new ValueType.Type(VoidTy), "");
         store.addOperands(res);
         store.addOperands(value);
