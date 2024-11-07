@@ -30,7 +30,7 @@ public class ValueType {
     }
 
     public static class Type {
-        private final DataType dataType;
+        private DataType dataType;
 
         public Type(DataType dataType) {
             this.dataType = dataType;
@@ -38,6 +38,10 @@ public class ValueType {
 
         public DataType getDataType() {
             return dataType;
+        }
+
+        public void setDataType(DataType dataType) {
+            this.dataType = dataType;
         }
 
         public int getDim() {
@@ -50,6 +54,10 @@ public class ValueType {
 
         public Type getAddr() {
             return new PointerType(this);
+        }
+
+        public Type deepClone() {
+            return new Type(this.getDataType());
         }
 
         @Override
@@ -99,6 +107,12 @@ public class ValueType {
         }
 
         @Override
+        public Type deepClone() {
+            Type newActType = this.actType.deepClone();
+            return new PointerType(newActType);
+        }
+
+        @Override
         public boolean equals(Object obj) {
             if (this == obj) {
                 return true;
@@ -130,6 +144,13 @@ public class ValueType {
 
         public void setDim(int dim) {
             this.dim = dim;
+        }
+
+        @Override
+        public Type deepClone() {
+            ArrayType newArray = new ArrayType(this.getDataType());
+            newArray.setDim(dim);
+            return newArray;
         }
 
         @Override

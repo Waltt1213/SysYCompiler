@@ -23,7 +23,7 @@ public class Constant extends Value {
     }
 
     public void setTp(ValueType.Type tp) {
-        this.tp = tp;
+        super.setTp(tp);
     }
 
     @Override
@@ -34,6 +34,13 @@ public class Constant extends Value {
     @Override
     public String getName() {
         return super.getName();
+    }
+
+    public Constant deepClone() {
+        Constant constant = new Constant(this.name);
+        constant.setTp(this.tp.deepClone());
+        constant.setString(this.isString);
+        return constant;
     }
 
     @Override

@@ -33,8 +33,20 @@ public class GlobalVariable extends Value {
         return tp.getDim() > 0;
     }
 
+    public boolean isString() {
+        return isArray() && initVal.get(0).getTp() instanceof ValueType.ArrayType
+                && initVal.get(0).getTp().getDataType() == ValueType.DataType.Integer8Ty;
+    }
+
     public void setInitVal(ArrayList<Value> initVal) {
         this.initVal = initVal;
+        if (!isString()) {
+            for (Value init: initVal) {
+                if (init.getTp().getDataType() != tp.getDataType()) {
+                    init.getTp().setDataType(tp.getDataType());
+                }
+            }
+        }
     }
 
     public ArrayList<Value> getInitVal() {
