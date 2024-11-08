@@ -57,7 +57,6 @@ public class Function extends Value {
     }
 
     public void setReturn(BasicBlock basicBlock) {
-        isReturn = true;
         Return ret = new Return(null);
         basicBlock.setTerminator(ret);
     }

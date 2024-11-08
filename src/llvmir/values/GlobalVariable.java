@@ -10,6 +10,7 @@ public class GlobalVariable extends Value {
     private ArrayList<Value> initVal;
     private boolean unnamed = false;
     private boolean isConstant = false;
+    private boolean isString = false;
 
     public GlobalVariable(ValueType.Type vt, String name) {
         super(vt, name);
@@ -33,13 +34,22 @@ public class GlobalVariable extends Value {
         return tp.getDim() > 0;
     }
 
+    public void setString(boolean string) {
+        isString = string;
+    }
+
     public boolean isString() {
-        return isArray() && initVal.get(0).getTp() instanceof ValueType.ArrayType
-                && initVal.get(0).getTp().getDataType() == ValueType.DataType.Integer8Ty;
+        return isString;
     }
 
     public void setInitVal(ArrayList<Value> initVal) {
         this.initVal = initVal;
+        if (initVal.size() == 1 && initVal.get(0) instanceof Constant) {
+            Constant constant = (Constant) initVal.get(0);
+            if (constant.isString()) {
+                setString(true);
+            }
+        }
         if (!isString()) {
             for (Value init: initVal) {
                 if (init.getTp().getDataType() != tp.getDataType()) {
@@ -58,7 +68,7 @@ public class GlobalVariable extends Value {
     }
 
     public Value getInit(int bis) {
-        if (!initVal.isEmpty() && ((Constant) initVal.get(0)).isString()) {
+        if (isString) {
             String content = initVal.get(0).getName();
             if (bis < content.length()) {
                 int init = Transform.str2int(String.valueOf(content.charAt(bis)));

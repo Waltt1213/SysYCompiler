@@ -422,8 +422,10 @@ public class Visitor {
             store.addOperands(argument);
             store.addOperands(alloca);
             curBasicBlock.appendInstr(store, false);
-            Symbol symbol = paramsSym.remove(0);
-            symbol.setValue(alloca);
+            if (!paramsSym.isEmpty()) {
+                Symbol symbol = paramsSym.remove(0);
+                symbol.setValue(alloca);
+            }
         }
     }
 
