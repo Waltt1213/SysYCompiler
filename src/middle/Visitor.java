@@ -268,7 +268,19 @@ public class Visitor {
                     curBasicBlock.appendInstr(store, false);
                     prePtr = getElementPtr;
                 }
-            } else {
+            } else if (alloca.isArray()) {
+                GetElementPtr getElementPtr = new GetElementPtr(alloca.getTp(), "");
+                getElementPtr.addOperands(alloca);
+                getElementPtr.addOperands(new Constant("0"));
+                getElementPtr.addOperands(new Constant("0"));
+                curBasicBlock.appendInstr(getElementPtr, true);
+                Value res = buildInit(getElementPtr, inits.get(0));
+                if (isConst) {
+                    alloca.setConst(true);
+                    alloca.addConstInit(res);
+                }
+            }
+            else {
                 Value res = buildInit(alloca, inits.get(0));
                 if (isConst) {
                     alloca.setConst(true);
