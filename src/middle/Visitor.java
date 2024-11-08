@@ -277,7 +277,7 @@ public class Visitor {
             }
         } else { // int数组
             Value prePtr = alloca;
-            for (int i = 0;  i < inits.size(); i++) {
+            for (int i = 0;  i < alloca.getDim(); i++) {
                 GetElementPtr getElementPtr = new GetElementPtr(prePtr.getTp(),"");
                 getElementPtr.addOperands(prePtr);
                 if (i == 0) {
@@ -286,8 +286,14 @@ public class Visitor {
                 } else {
                     getElementPtr.addOperands(new Constant("1"));
                 }
-                curBasicBlock.appendInstr(getElementPtr, true);
-                Value res = buildInit(getElementPtr, inits.get(i));
+                Value res = null;
+                if (i < inits.size()) {
+                    curBasicBlock.appendInstr(getElementPtr, true);
+                    res = buildInit(getElementPtr, inits.get(i));
+                } else if (isConst) {
+                    curBasicBlock.appendInstr(getElementPtr, true);
+                    res = buildInit(getElementPtr, new Constant(new ValueType.Type(alloca.getDataType()), "0"));
+                }
                 if (isConst) {
                     alloca.setConst(true);
                     alloca.addConstInit(res);

@@ -9,7 +9,7 @@ import java.util.ArrayList;
 public class Alloca extends Instruction {
     // 传递进来的vt是ArrayType
     private boolean isConst = false;
-    private ArrayList<Value> constInits;
+    private final ArrayList<Value> constInits;
 
     public Alloca(ValueType.Type vt, String name) {
         super(vt, Type.ALLOCA, name);
@@ -33,6 +33,9 @@ public class Alloca extends Instruction {
     }
 
     public void addConstInit(Value value) {
+        if (value == null) {
+            return;
+        }
         constInits.add(value);
     }
 
