@@ -4,22 +4,23 @@ import llvmir.values.Function;
 import llvmir.values.GlobalVariable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 
 public class Module extends Value {
-    private ArrayList<Function> declares;
+    private HashMap<String, Function> declares;
     private ArrayList<Function> functions;
     private LinkedList<GlobalVariable> globalValues;
 
     public Module(ValueType.Type vt, String name) {
         super(vt, name);
-        declares = new ArrayList<>();
+        declares = new HashMap<>();
         functions = new ArrayList<>();
         globalValues = new LinkedList<>();
     }
 
     public void addDeclare(Function declare) {
-        declares.add(declare);
+        declares.put(declare.name, declare);
     }
 
     public void addFunction(Function func) {
@@ -31,18 +32,20 @@ public class Module extends Value {
     }
 
     public Function getDeclare(String name) {
-        for (Function function : declares) {
-            if (function.name.equals(name)) {
-                return function;
-            }
+        if (declares.containsKey(name)) {
+            return declares.get(name);
         }
         return null;
+    }
+
+    public boolean containsDeclare(String name) {
+        return declares.containsKey(name);
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        for (Function declare : declares) {
+        for (Function declare : declares.values()) {
             sb.append(declare.toString()).append('\n');
         }
         sb.append("\n");

@@ -9,7 +9,7 @@ public class Symbol {
     private Value value;
     private final int depth;
     private final int lineno;
-    private FuncFParams funcFParams;
+    private FuncFParams funcFParams;    // For Function
 
     public Symbol(String name, SymType type, int depth, int lineno) {
         this.depth = depth;

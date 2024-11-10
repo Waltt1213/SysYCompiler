@@ -15,7 +15,6 @@ import utils.Transform;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 import static llvmir.ValueType.DataType.*;
 import static llvmir.values.instr.Instruction.*;
@@ -23,9 +22,7 @@ import static llvmir.values.instr.Instruction.*;
 public class Visitor {
     private final CompUnit root;
     private final ArrayList<SymbolTable> symbolTables;    //  符号表集
-    private final ArrayDeque<SymbolTable> tableStack;     // 符号表栈
     private final Module module = new Module(new ValueType.Type(VoidTy), "global");
-    private final HashMap<String, Symbol> funcNameTable;
     private SymbolTable curTable;
     private int curDepth;
     private Function curFunction;
@@ -37,21 +34,16 @@ public class Visitor {
         this.root = compUnit;
         curDepth = 1;
         symbolTables = new ArrayList<>();
-        tableStack = new ArrayDeque<>();
-        funcNameTable = new HashMap<>();
         loopBlockStack = new ArrayDeque<>();
         this.errors = errors;
     }
 
     public void buildIR() {
         curTable = new SymbolTable(null, curDepth);
-        tableStack.push(curTable);
         symbolTables.add(curTable);
         curFunction = null;
         curBasicBlock = null;
-        buildDeclare();
         visitCompUnit(root);
-        tableStack.clear();
     }
 
     public ArrayList<SymbolTable> getSymbolTables() {
@@ -80,29 +72,6 @@ public class Visitor {
         visitMainFuncDef(compUnit.getMainFuncDef());
     }
 
-    public void buildDeclare() {
-        Function getint = new Function(new ValueType.Type(Integer32Ty),"getint", module, false);
-        module.addDeclare(getint);
-
-        Function getChar = new Function(new ValueType.Type(Integer32Ty),"getchar", module, false);
-        module.addDeclare(getChar);
-
-        Function putint = new Function(new ValueType.Type(VoidTy),"putint", module, false);
-        module.addDeclare(putint);
-        putint.addParams(new Argument(new ValueType.Type(Integer32Ty), "param"));
-
-        Function putch = new Function(new ValueType.Type(VoidTy),"putch", module, false);
-        module.addDeclare(putch);
-        putch.addParams(new Argument(new ValueType.Type(Integer32Ty), "param"));
-
-        Function putstr = new Function(new ValueType.Type(VoidTy),"putstr", module, false);
-        module.addDeclare(putstr);
-        putstr.addParams(new Argument(new ValueType.PointerType(Integer8Ty), "param"));
-
-        // 加入符号表
-
-    }
-
     public void visitFuncDef(FuncDef fd) {
         SlotTracker.reset();
         String funcType = getType(fd.getFuncType().getType());
@@ -118,7 +87,6 @@ public class Visitor {
             funcSym.setValue(function);
             curFunction = function;
             curTable.addSymItem(funcName, funcSym);
-            funcNameTable.put(funcName, funcSym);
         } catch (Error e) {
             errors.add(new Error("b", fd.getFuncType().getType().getLineno()));
         }
@@ -131,7 +99,6 @@ public class Visitor {
         curTable.addChildren(st);   // 新表设为当前表的孩子
         curTable = st;
         symbolTables.add(curTable); // 将符号表加入符号表集
-        tableStack.push(curTable); // 入栈
         ArrayList<Symbol> paramsSym = new ArrayList<>();
         if (fd.getFuncFParams() != null) {
             try {
@@ -160,19 +127,7 @@ public class Visitor {
             }
         }
         curDepth--;
-        tableStack.pop();           // 符号表出栈
-        curTable = tableStack.peek();
-    }
-
-    public void visitConstDecl(ConstDecl cd) {
-        String varType = getType(cd.getType()); // Int or Char
-        for (AstNode astChild : cd.getAstChild()) {
-            try {
-                visitConstDef(varType, (ConstDef) astChild);
-            } catch (Error e) {
-                errors.add(new Error("b", ((ConstDef) astChild).getIdent().getLineno()));
-            }
-        }
+        curTable = curTable.getFatherTable();
     }
 
     public void visitMainFuncDef(MainFuncDef astNode) {
@@ -195,9 +150,19 @@ public class Visitor {
         curTable.addChildren(st);   // 新表设为当前表的孩子
         curTable = st;
         symbolTables.add(curTable); // 将符号表加入符号表集
-        tableStack.push(curTable); // 入栈
         curBasicBlock.setName(SlotTracker.slot()); // 基本块占一个%
         visitBlock(astNode.getBlock());
+    }
+
+    public void visitConstDecl(ConstDecl cd) {
+        String varType = getType(cd.getType()); // Int or Char
+        for (AstNode astChild : cd.getAstChild()) {
+            try {
+                visitConstDef(varType, (ConstDef) astChild);
+            } catch (Error e) {
+                errors.add(new Error("b", ((ConstDef) astChild).getIdent().getLineno()));
+            }
+        }
     }
 
     public void visitConstDef(String varType, ConstDef constDef) throws Error {
@@ -475,7 +440,6 @@ public class Visitor {
             curTable.addChildren(st);   // 新表设为当前表的孩子
             curTable = st;
             symbolTables.add(curTable); // 将符号表加入符号表集
-            tableStack.push(curTable); // 入栈
             visitBlock((Block) stmt.getStmts().get(0));
         } else if (!stmt.getStmts().isEmpty() && stmt.getStmts().get(0) instanceof LVal) {
             String name = ((LVal) stmt.getStmts().get(0)).getIdentName();
@@ -500,25 +464,41 @@ public class Visitor {
                 store.addOperands(value);
                 curBasicBlock.appendInstr(store, false);
             } else if (stmt.getType() == Stmt.StmtType.GETINT) {
-                Function getint = module.getDeclare("getint");
-                Call call = new Call("", getint);
-                curBasicBlock.appendInstr(call, true);
-                Value value1 = zext(call);
-                Store store = new Store(new ValueType.Type(VoidTy), "");
-                store.addOperands(value1);
-                store.addOperands(value);
-                curBasicBlock.appendInstr(store, false);
+                visitGetInt(value);
             } else if (stmt.getType() == Stmt.StmtType.GETCHAR) {
-                Function getint = module.getDeclare("getchar");
-                Call call = new Call("", getint);
-                curBasicBlock.appendInstr(call, true);
-                Value value1 = trunc(call);
-                Store store = new Store(new ValueType.Type(VoidTy), "");
-                store.addOperands(value1);
-                store.addOperands(value);
-                curBasicBlock.appendInstr(store, false);
+                visitGetChar(value);
             }
         }
+    }
+
+    public void visitGetInt(Value value) {
+        Function getint = module.getDeclare("getint");
+        if (getint == null) {
+            getint = new Function(new ValueType.Type(Integer32Ty), "getint", module, false);
+            module.addDeclare(getint);
+        }
+        Call call = new Call("", getint);
+        curBasicBlock.appendInstr(call, true);
+        Value value1 = zext(call);
+        Store store = new Store(new ValueType.Type(VoidTy), "");
+        store.addOperands(value1);
+        store.addOperands(value);
+        curBasicBlock.appendInstr(store, false);
+    }
+
+    public void visitGetChar(Value value) {
+        Function getchar = module.getDeclare("getchar");
+        if (getchar == null) {
+            getchar = new Function(new ValueType.Type(Integer32Ty), "getchar", module, false);
+            module.addDeclare(getchar);
+        }
+        Call call = new Call("", getchar);
+        curBasicBlock.appendInstr(call, true);
+        Value value1 = trunc(call);
+        Store store = new Store(new ValueType.Type(VoidTy), "");
+        store.addOperands(value1);
+        store.addOperands(value);
+        curBasicBlock.appendInstr(store, false);
     }
 
     public void visitReturn(Stmt stmt) {
@@ -716,7 +696,6 @@ public class Visitor {
             }
         }
         String globalStr = sb.toString();
-        // System.out.println(globalStr);
         sb.setLength(0);
         if (!globalStr.isEmpty()) {
             ValueType.ArrayType arrayType = new ValueType.ArrayType(Integer8Ty);
@@ -733,6 +712,11 @@ public class Visitor {
     public void buildPrintf(Value var, java.lang.Character c) {
         if (c == 's') {
             Function putstr = module.getDeclare("putstr");
+            if (putstr == null) {
+                putstr = new Function(new ValueType.Type(VoidTy),"putstr", module, false);
+                module.addDeclare(putstr);
+                putstr.addParams(new Argument(new ValueType.PointerType(Integer8Ty), "param"));
+            }
             Call call = new Call(putstr);
             curBasicBlock.appendInstr(call, false);
             GetElementPtr getElementPtr = new GetElementPtr(var.getTp(), null);
@@ -742,12 +726,22 @@ public class Visitor {
             call.addFuncRParam(getElementPtr);
         } else if (c == 'c') {
             Function putch = module.getDeclare("putch");
+            if (putch == null) {
+                putch = new Function(new ValueType.Type(VoidTy), "putch", module, false);
+                module.addDeclare(putch);
+                putch.addParams(new Argument(new ValueType.Type(Integer32Ty), "param"));
+            }
             Call call = new Call(putch);
             Value newVar = zext(var);
             call.addFuncRParam(newVar);
             curBasicBlock.appendInstr(call, false);
         } else {
             Function putint = module.getDeclare("putint");
+            if (putint == null) {
+                putint = new Function(new ValueType.Type(VoidTy), "putint", module, false);
+                module.addDeclare(putint);
+                putint.addParams(new Argument(new ValueType.Type(Integer32Ty), "param"));
+            }
             Call call = new Call(putint);
             Value newVar = zext(var);
             call.addFuncRParam(newVar);
@@ -1050,12 +1044,11 @@ public class Visitor {
             }
             Function callFunc = (Function) symbol.getValue();
             Call call = new Call(callFunc);
-            if (unaryExp.hasFuncRParams() && funcNameTable.containsKey(name)) {
-                Symbol func = funcNameTable.get(name);
-                if (func != null && unaryExp.getArgc() != ((Function) func.getValue()).getArgc()) {
+            if (unaryExp.hasFuncRParams()) {
+                if (unaryExp.getArgc() != ((Function) symbol.getValue()).getArgc()) {
                     errors.add(new Error("d", unaryExp.getLineno()));
-                } else if (func != null) {
-                    call.setFuncRParams(visitFuncRParams(func.getFuncFParams(), unaryExp.getFuncRParams()));
+                } else {
+                    call.setFuncRParams(visitFuncRParams(symbol.getFuncFParams(), unaryExp.getFuncRParams()));
                 }
             }
             curBasicBlock.appendInstr(call, callFunc.isNotVoid());
