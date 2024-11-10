@@ -279,15 +279,14 @@ public class Visitor {
                     alloca.setConst(true);
                     alloca.addConstInit(res);
                 }
-            }
-            else {
+            } else {
                 Value res = buildInit(alloca, inits.get(0));
                 if (isConst) {
                     alloca.setConst(true);
                     alloca.addConstInit(res);
                 }
             }
-        } else { // int数组
+        } else { // 数组
             Value prePtr = alloca;
             for (int i = 0;  i < alloca.getDim(); i++) {
                 GetElementPtr getElementPtr = new GetElementPtr(prePtr.getTp(),"");
@@ -1104,67 +1103,116 @@ public class Visitor {
             return new Value(new ValueType.Type(Integer32Ty), "null");
         }
         Value value = symbol.getValue();
-        // 如果是左值
+        // 如果是左值，只能是非Const类型的，并且要的是地址
+        if (isOperand) {
+            return visitOperand(lVal, value);
+        } else {
+            return visitLeft(lVal, value);
+        }
+    }
+
+    /**
+     * @param lVal  ast中的左值结点
+     * @param value 左值
+     *              只能是非Const类型的，返回类型是地址
+     * @return 左值地址
+     */
+    public Value visitLeft(LVal lVal, Value value) {
+        Value res = value;
+        if (lVal.isArrayElement()) { // 数组元素
+            Value index = visitAddExp(lVal.getExp().getAddExp());
+            res = getElement(value, index);
+        }
+        return res;
+    }
+
+    /**
+     * @param lVal ast语法书中的左值节点
+     * @param value 操作数
+     * @return 操作数的值
+     */
+    public Value visitOperand(LVal lVal, Value value) {
+        Value operand = value;
+        // 包含以下情况：
+        // 1. 全局：常量（包括数组和数组元素），变量
+        // 2. 局部：常量 (包括数组和数组元素)，变量
+        // 3. 其中常量数组元素下标有确定和不确定两种情况（若确定可以直接获取值，不确定则需要计算偏移地址）
         if (value instanceof GlobalVariable && ((GlobalVariable) value).isConstant()) {
+            // 获取全局常量和常量数组元素的值
             GlobalVariable globalVar = (GlobalVariable) value;
-            if (!globalVar.isArray()) {
-                value =  ((Constant) globalVar.getInitVal().get(0)).deepClone();
-            } else if (globalVar.isArray() && lVal.isArrayElement()) {
-                int bis = Integer.parseInt(visitAddExp(lVal.getExp().getAddExp()).getName());
-                value =  ((Constant) globalVar.getInit(bis)).deepClone();
+            if (!globalVar.isArray()) { // 常量
+                return ((Constant) globalVar.getInitVal().get(0)).deepClone();
+            } else if (globalVar.isArray() && lVal.isArrayElement()) {  // 数组元素
+                Value index = visitAddExp(lVal.getExp().getAddExp());
+                if (index instanceof Constant) {    // 下标是常数
+                    int bis = Integer.parseInt(index.getName());
+                    return ((Constant) globalVar.getInit(bis)).deepClone();
+                }  else {    // 下标不确定
+                    operand = getElement(value, index); // 获取地址
+                }
             }
-        } else if (value instanceof Alloca && ((Alloca) value).isConst()) {
+        }
+        if (value instanceof Alloca && ((Alloca) value).isConst()) {
+            // 获取局部常量和常量数组元素的值
             Alloca alloca = (Alloca) value;
             if (!alloca.isArray()) {
-                value =  ((Constant) alloca.getConstInits().get(0)).deepClone();
-            } else if (alloca.isArray() && lVal.isArrayElement()) {
-                int bis = Integer.parseInt(visitAddExp(lVal.getExp().getAddExp()).getName());
-                value =  ((Constant) alloca.getInit(bis)).deepClone();
+                return ((Constant) alloca.getConstInits().get(0)).deepClone();
+            } else if (alloca.isArray() && lVal.isArrayElement()) { // 数组元素
+                Value index = visitAddExp(lVal.getExp().getAddExp());
+                if (index instanceof Constant) {    // 下标确定
+                    int bis = Integer.parseInt(index.getName());
+                    return ((Constant) alloca.getInit(bis)).deepClone();
+                } else {    // 下标不确定
+                    operand = getElement(value, index);
+                }
             }
-        } else if (lVal.isArrayElement()) { // 传递数组元素指针
+        }
+        // 全局和局部数组，需要传递数组的指针
+        if (!lVal.isArrayElement() && value.getTp() instanceof ValueType.PointerType
+                && value.getTp().getInnerType() instanceof ValueType.ArrayType) {
+            GetElementPtr getElementPtr = new GetElementPtr(value.getTp(), "");
+            getElementPtr.addOperands(value);
+            getElementPtr.addOperands(new Constant("0"));
+            getElementPtr.addOperands(new Constant("0"));
+            curBasicBlock.appendInstr(getElementPtr, true);
+            operand = getElementPtr;
+            return operand;
+        }
+        if (lVal.isArrayElement()) { // 数组元素
             Value index = visitAddExp(lVal.getExp().getAddExp());
-            if (value.getTp().getActType() instanceof ValueType.PointerType) {
-                Load load = new Load(value.getTp().getActType(), "");
-                load.addOperands(value);
-                curBasicBlock.appendInstr(load, true);
-                value = load;
-            }
-            // String bis = index.getName();
-            GetElementPtr getElementPtr = new GetElementPtr(value.getTp(), "");
-            getElementPtr.addOperands(value);
-            if (value.getTp().getActType() instanceof ValueType.ArrayType) {
-                getElementPtr.addOperands(new Constant("0"));
-            }
-            getElementPtr.addOperands(index); // TODO: 有变化 原本为bis
-            curBasicBlock.appendInstr(getElementPtr, true);
-            value = getElementPtr;
-        } else if (value.getTp() instanceof ValueType.PointerType
-                && value.getTp().getActType() instanceof ValueType.ArrayType) { // 例如传递数组指针
-            GetElementPtr getElementPtr = new GetElementPtr(value.getTp(), "");
-            getElementPtr.addOperands(value);
-            getElementPtr.addOperands(new Constant("0"));
-            getElementPtr.addOperands(new Constant("0"));
-            curBasicBlock.appendInstr(getElementPtr, true);
-            value = getElementPtr;
-            return value;
+            operand = getElement(value, index);
         }
-        if (!isOperand) { // 等号左边的左值，需要返回的是指针
-            return value;
-        }
-        // 如果是const
-        if (value instanceof GlobalVariable && ((GlobalVariable) value).isConstant()) {
-            return value;
-        } else if (value instanceof Alloca && ((Alloca) value).isConst()) {
-            return value;
-        }
-        // 等号右边的左值，需要返回的是load下来的值
-        if (value instanceof GlobalVariable || value instanceof Alloca || value instanceof GetElementPtr) {
-            Load load = new Load(value.getTp().getActType(), "");
-            load.addOperands(value);
+        // 全局和局部变量，以及数组元素指针：直接load
+        if (operand instanceof GlobalVariable
+                || operand instanceof Alloca
+                || operand instanceof GetElementPtr) {
+            Load load = new Load(operand.getTp().getInnerType(), "");
+            load.addOperands(operand);
             curBasicBlock.appendInstr(load, true);
             return load;
         }
-        return value;
+        return operand;
+    }
+
+    public Value getElement(Value value, Value index) {
+        Value operand = value;
+        if (value.getTp().getInnerType() instanceof ValueType.PointerType) {
+            // 如果是数组指针，那么需要先load出数组地址，再用load出的地址寻找元素
+            Load load = new Load(value.getTp().getInnerType(), "");
+            load.addOperands(value);
+            curBasicBlock.appendInstr(load, true);
+            operand = load;
+        }
+        GetElementPtr getElementPtr = new GetElementPtr(operand.getTp(), "");
+        getElementPtr.addOperands(operand);
+        if (operand.getTp().getInnerType() instanceof ValueType.ArrayType) {
+            // 如果是数组指针则需要索引添加0
+            getElementPtr.addOperands(new Constant("0"));
+        }
+        getElementPtr.addOperands(index); // TODO: 有变化 原本为bis
+        curBasicBlock.appendInstr(getElementPtr, true);
+        operand = getElementPtr;
+        return operand;
     }
 
     public ArrayList<Value> visitFuncRParams(FuncFParams ffp, FuncRParams frp) {

@@ -11,7 +11,7 @@ public class GetElementPtr extends Instruction {
 
     @Override
     public ValueType.Type getTp() {
-        return tp.getActType().getAddr();
+        return tp.getInnerType().getAddr();
     }
 
     @Override
@@ -21,7 +21,7 @@ public class GetElementPtr extends Instruction {
         }
         StringBuilder sb = new StringBuilder();
         sb.append(getTp()).append(" getelementptr inbounds (");
-        sb.append(tp.getActType()).append(", ");
+        sb.append(tp.getInnerType()).append(", ");
         sb.append(getOperands().get(0).getDef());
         sb.append(", ").append(getOperands().get(1).getDef());
         if (getOperands().size() > 2) {
@@ -35,7 +35,7 @@ public class GetElementPtr extends Instruction {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(getFullName()).append(" = getelementptr inbounds ");
-        sb.append(tp.getActType()).append(", ");
+        sb.append(tp.getInnerType()).append(", ");
         sb.append(getOperands().get(0).getDef());
         sb.append(", ").append(getOperands().get(1).getDef());
         if (getOperands().size() > 2) {

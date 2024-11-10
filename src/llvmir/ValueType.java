@@ -48,7 +48,7 @@ public class ValueType {
             return 0;
         }
 
-        public Type getActType() {
+        public Type getInnerType() {
             return this;
         }
 
@@ -92,7 +92,7 @@ public class ValueType {
         }
 
         @Override
-        public Type getActType() {
+        public Type getInnerType() {
             return actType;
         }
 
