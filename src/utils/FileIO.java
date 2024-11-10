@@ -1,5 +1,7 @@
 package utils;
 
+import backend.mips.MipsDataSeg;
+import backend.mips.MipsInstruction;
 import frontend.Error;
 import frontend.Token;
 import frontend.TokenType;
@@ -19,6 +21,7 @@ public class FileIO {
     private static final String parserFilePath = String.valueOf(Paths.get("parser.txt"));
     private static final String symbolFilePath = String.valueOf(Paths.get("symbol.txt"));
     private static final String llvmIrFilePath = String.valueOf(Paths.get("llvm_ir.txt"));
+    private static final String mipsFilePath = String.valueOf(Paths.get("mips.txt"));
 
     public static String readTestFile() throws IOException {
         FileReader fr = new FileReader(testFilePath);
@@ -89,6 +92,26 @@ public class FileIO {
         FileWriter fw = new FileWriter(llvmIrFilePath);
         BufferedWriter bw = new BufferedWriter(fw);
         bw.write(module.toString());
+        bw.close();
+        fw.close();
+    }
+
+    public static void printMipsCode(ArrayList<MipsDataSeg> dataSegment,
+                                     ArrayList<MipsInstruction> textSegment) throws IOException {
+        FileWriter fw = new FileWriter(mipsFilePath);
+        BufferedWriter bw = new BufferedWriter(fw);
+        if (!dataSegment.isEmpty()) {
+            bw.write(".data\n");
+        }
+        for (MipsDataSeg dataSeg: dataSegment) {
+            bw.write(dataSeg.toString() + "\n");
+        }
+        if (!textSegment.isEmpty()) {
+            bw.write(".text\n");
+        }
+        for (MipsInstruction instruction: textSegment) {
+            bw.write(instruction.toString() + "\n");
+        }
         bw.close();
         fw.close();
     }

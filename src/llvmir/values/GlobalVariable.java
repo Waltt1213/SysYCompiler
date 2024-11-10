@@ -34,6 +34,10 @@ public class GlobalVariable extends Value {
         return tp.getDim() > 0;
     }
 
+    public ValueType.DataType getDateType() {
+        return tp.getDataType();
+    }
+
     public void setString(boolean string) {
         isString = string;
     }
@@ -61,6 +65,37 @@ public class GlobalVariable extends Value {
 
     public ArrayList<Value> getInitVal() {
         return initVal;
+    }
+
+    public String getInitValtoString() {
+        StringBuilder sb = new StringBuilder();
+        if (tp.getDim() == 0) { // 单独元素
+            if (initVal != null && !initVal.isEmpty()) {
+                sb.append(initVal.get(0).getName());
+            } else {
+                sb.append("0");
+            }
+        } else {    // 数组
+            if (initVal == null || initVal.isEmpty()) {
+                sb.append(0).append(":").append(tp.getDim());   // 全部填0
+            } else {
+                if (isString) {
+                    sb.append("\"").append(initVal.get(0).getName()).append("\"");
+                } else {
+                    for (int i = 0; i < tp.getDim(); i++) {
+                        if (i < initVal.size()) {
+                            sb.append(initVal.get(i).getName());
+                        } else {
+                            sb.append(" 0");
+                        }
+                        if (i < tp.getDim() - 1) {
+                            sb.append(", ");
+                        }
+                    }
+                }
+            }
+        }
+        return sb.toString();
     }
 
     public void addInitVal(Value value) {
@@ -93,8 +128,7 @@ public class GlobalVariable extends Value {
 
     public String getInits() {
         StringBuilder sb = new StringBuilder();
-        if (initVal.get(0).getTp() instanceof ValueType.ArrayType
-                && initVal.get(0).getTp().getDataType() == ValueType.DataType.Integer8Ty) {
+        if (isString) {
             ValueType.ArrayType type = (ValueType.ArrayType) tp;
             String s = Transform.charList2string(initVal.get(0).getName());
             // System.out.println(s);

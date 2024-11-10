@@ -1,3 +1,4 @@
+import backend.Translator;
 import frontend.Lexer;
 import frontend.Parser;
 import middle.Visitor;
@@ -30,5 +31,10 @@ public class Compiler {
 
         // Step 5: print the LLVM IR
         FileIO.printLlvmIrResult(visitor.getModule());
+
+        // Step6: generate Mips code and print the result
+        Translator translator = new Translator(visitor.getModule());
+        translator.genMipsCode();
+        FileIO.printMipsCode(translator.getDataSegment(), translator.getTextSegment());
     }
 }

@@ -38,8 +38,8 @@ public class Module extends Value {
         return null;
     }
 
-    public boolean containsDeclare(String name) {
-        return declares.containsKey(name);
+    public LinkedList<GlobalVariable> getGlobalValues() {
+        return globalValues;
     }
 
     @Override

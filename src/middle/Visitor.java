@@ -685,6 +685,7 @@ public class Visitor {
                     var.setUnnamed(true);
                     var.setConstant(true);
                     var.addInitVal(new Constant(new ValueType.ArrayType(Integer8Ty), globalStr));
+                    var.setString(true);
                     module.addGlobalValue(var);
                     buildPrintf(var, 's'); // 打印字符串
                 }
@@ -703,6 +704,7 @@ public class Visitor {
             GlobalVariable var = new GlobalVariable(arrayType, SlotTracker.slotStr());
             var.setUnnamed(true);
             var.setConstant(true);
+            var.setString(true);
             var.addInitVal(new Constant(new ValueType.ArrayType(Integer8Ty), globalStr));
             module.addGlobalValue(var);
             buildPrintf(var, 's'); // 打印字符串
