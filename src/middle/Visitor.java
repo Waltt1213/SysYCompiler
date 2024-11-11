@@ -77,7 +77,7 @@ public class Visitor {
         String funcType = getType(fd.getFuncType().getType());
         SymType ft = new SymType(funcType, false, false, true);
         String funcName = fd.getIdent().getContent();
-        Function function = new Function(getDataType(funcType), funcName, module, true);
+        Function function = new Function(getDataType(funcType), funcName, true);
         // 创建函数并加入module
         module.addFunction(function);
         try {
@@ -91,7 +91,7 @@ public class Visitor {
             errors.add(new Error("b", fd.getFuncType().getType().getLineno()));
         }
         // 创建一个基本块
-        curBasicBlock = new BasicBlock("");
+        curBasicBlock = new BasicBlock("", curFunction);
         function.addBasicBlock(curBasicBlock);
         // 形参需要加入符号表，但属于下一层级
         curDepth++;
@@ -134,12 +134,12 @@ public class Visitor {
         // 归零
         SlotTracker.reset();
         // 创建main函数
-        Function main = new Function(new ValueType.Type(Integer32Ty), "main", module, true);
+        Function main = new Function(new ValueType.Type(Integer32Ty), "main", true);
         curFunction = main;
         // 加入module
         module.addFunction(main);
         // 添加一个基本块
-        curBasicBlock = new BasicBlock("");
+        curBasicBlock = new BasicBlock("", curFunction);
         main.addBasicBlock(curBasicBlock);
         if (!astNode.getBlock().hasRet()) {
             errors.add(new Error("g", (astNode).getBlock().getLineno()));
@@ -474,7 +474,7 @@ public class Visitor {
     public void visitGetInt(Value value) {
         Function getint = module.getDeclare("getint");
         if (getint == null) {
-            getint = new Function(new ValueType.Type(Integer32Ty), "getint", module, false);
+            getint = new Function(new ValueType.Type(Integer32Ty), "getint", false);
             module.addDeclare(getint);
         }
         Call call = new Call("", getint);
@@ -489,7 +489,7 @@ public class Visitor {
     public void visitGetChar(Value value) {
         Function getchar = module.getDeclare("getchar");
         if (getchar == null) {
-            getchar = new Function(new ValueType.Type(Integer32Ty), "getchar", module, false);
+            getchar = new Function(new ValueType.Type(Integer32Ty), "getchar", false);
             module.addDeclare(getchar);
         }
         Call call = new Call("", getchar);
@@ -524,11 +524,11 @@ public class Visitor {
     }
 
     public void visitIf(Stmt stmt) {
-        BasicBlock ifBlock = new BasicBlock("");
-        BasicBlock endBlock = new BasicBlock("");
+        BasicBlock ifBlock = new BasicBlock("", curFunction);
+        BasicBlock endBlock = new BasicBlock("", curFunction);
         BasicBlock elseBlock = null;
         if (stmt.getStmts().size() > 2) {
-            elseBlock = new BasicBlock("");
+            elseBlock = new BasicBlock("", curFunction);
         }
         // 进入条件判断
         visitCond((Cond) stmt.getStmts().get(0), ifBlock, endBlock, elseBlock);
@@ -566,11 +566,11 @@ public class Visitor {
     }
 
     public void visitFor(Stmt stmt) {
-        BasicBlock outBlock = new BasicBlock("");
-        BasicBlock.ForBlock condBlock = new BasicBlock.ForBlock("", outBlock);
+        BasicBlock outBlock = new BasicBlock("", curFunction);
+        BasicBlock.ForBlock condBlock = new BasicBlock.ForBlock("", outBlock, curFunction);
         BasicBlock updateBlock = null;
         if (stmt.getStmts().get(2) != null) {
-            updateBlock = new BasicBlock("");
+            updateBlock = new BasicBlock("", curFunction);
             condBlock.setUpdateBlock(updateBlock);
         }
         // 初始化
@@ -578,7 +578,7 @@ public class Visitor {
             visitForStmt((ForStmt) stmt.getStmts().get(0)); // 执行第一个ForStmt
         }
         // 进入条件判断
-        BasicBlock judgeBlock = new BasicBlock("");
+        BasicBlock judgeBlock = new BasicBlock("", curFunction);
         Branch judge = new Branch("");
         curBasicBlock.setTerminator(judge);
         if (stmt.getStmts().get(1) != null) {
@@ -715,7 +715,7 @@ public class Visitor {
         if (c == 's') {
             Function putstr = module.getDeclare("putstr");
             if (putstr == null) {
-                putstr = new Function(new ValueType.Type(VoidTy),"putstr", module, false);
+                putstr = new Function(new ValueType.Type(VoidTy),"putstr", false);
                 module.addDeclare(putstr);
                 putstr.addParams(new Argument(new ValueType.PointerType(Integer8Ty), "param"));
             }
@@ -729,7 +729,7 @@ public class Visitor {
         } else if (c == 'c') {
             Function putch = module.getDeclare("putch");
             if (putch == null) {
-                putch = new Function(new ValueType.Type(VoidTy), "putch", module, false);
+                putch = new Function(new ValueType.Type(VoidTy), "putch", false);
                 module.addDeclare(putch);
                 putch.addParams(new Argument(new ValueType.Type(Integer32Ty), "param"));
             }
@@ -740,7 +740,7 @@ public class Visitor {
         } else {
             Function putint = module.getDeclare("putint");
             if (putint == null) {
-                putint = new Function(new ValueType.Type(VoidTy), "putint", module, false);
+                putint = new Function(new ValueType.Type(VoidTy), "putint", false);
                 module.addDeclare(putint);
                 putint.addParams(new Argument(new ValueType.Type(Integer32Ty), "param"));
             }
@@ -777,7 +777,7 @@ public class Visitor {
         BasicBlock next; // 表示后面还有或判断
         for (int i = 0; i < lOrExp.getLAndExps().size(); i++) {
             if (i < lOrExp.getLAndExps().size() - 1) {
-                next = new BasicBlock("");
+                next = new BasicBlock("", curFunction);
             } else {
                 next = null;
             }
@@ -840,7 +840,7 @@ public class Visitor {
             if (i == lAndExp.getEqExps().size() - 1) {
                 tureBlock = blocks.get(0);
             } else {
-                BasicBlock judge = new BasicBlock(SlotTracker.slot()); // 新的基本块做下一个与判断
+                BasicBlock judge = new BasicBlock(SlotTracker.slot(), curFunction); // 新的基本块做下一个与判断
                 tureBlock = judge;
                 curFunction.addBasicBlock(judge);
             }

@@ -42,6 +42,14 @@ public class Module extends Value {
         return globalValues;
     }
 
+    public ArrayList<Function> getFunctions() {
+        return functions;
+    }
+
+    public HashMap<String, Function> getDeclares() {
+        return declares;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();

@@ -1,19 +1,37 @@
 package backend.mips;
 
-import llvmir.ValueType;
-
 public class MipsRegister {
-    public static String[] RegName = {
+    public static String[] RegName = {  // t8 t9的编号与mips原设计有出入
             "$zero", "$at", "$v0", "$v1", "$a0", "$a1", "$a2", "$a3",
             "$t0", "$t1", "$t2", "$t3", "$t4", "$t5", "$t6", "$t7",
+            "$t8", "$t9",
             "$s0", "$s1", "$s2", "$s3", "$s4", "$s5", "$s6", "$s7",
-            "$t8", "$t9", "$k0", "$k1", "$gp", "$sp", "$fp", "$ra"
+            "$k0", "$k1", "$gp", "$sp", "$fp", "$ra"
     };
 
-    private String name;
+    private final String name;
+    private int no;
 
     public MipsRegister(String name) {
         this.name = name;
+        for (int i = 0; i < RegName.length; i++) {
+            if (RegName[i].equals(name)) {
+                this.no = i;
+            }
+        }
+    }
+
+    public MipsRegister(int i) {
+        this.name = RegName[i];
+        this.no = i;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getNo() {
+        return no;
     }
 
     @Override

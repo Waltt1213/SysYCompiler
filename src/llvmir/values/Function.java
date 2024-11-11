@@ -11,16 +11,14 @@ import java.util.LinkedList;
 public class Function extends Value {
     private ArrayList<Argument> funcFParams;
     private LinkedList<BasicBlock> basicBlocks;
-    private final Module parent;
     private boolean isDefine;
     private boolean isNotVoid;
     private boolean isReturn;
 
-    public Function(ValueType.Type vt, String name, Module module,
+    public Function(ValueType.Type vt, String name,
                     boolean isDefine) {
         super(vt, name);
         basicBlocks = new LinkedList<>();
-        parent = module;
         funcFParams = new ArrayList<>();
         this.isDefine = isDefine;
         isNotVoid = false;
@@ -50,6 +48,10 @@ public class Function extends Value {
 
     public ArrayList<Argument> getFuncFParams() {
         return funcFParams;
+    }
+
+    public LinkedList<BasicBlock> getBasicBlocks() {
+        return basicBlocks;
     }
 
     public boolean isReturn() {
@@ -89,7 +91,7 @@ public class Function extends Value {
 
     @Override
     public String getName() {
-        return "@" + super.getName();
+        return super.getName();
     }
 
     @Override

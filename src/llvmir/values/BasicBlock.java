@@ -10,23 +10,14 @@ import java.util.LinkedList;
 
 public class BasicBlock extends Value {
     private final LinkedList<Instruction> instructions;
-    private ArrayList<Label> preds;
-    private Function parent;
+    private final Function parent;
     private boolean isLabeled;
     private boolean isTerminator;
 
-    public BasicBlock(String name) {
+    public BasicBlock(String name, Function function) {
         super(new ValueType.Type(ValueType.DataType.LabelTy), name);
         instructions = new LinkedList<>();
-        preds = new ArrayList<>();
-    }
-
-    public void setParent(Function parent) {
-        this.parent = parent;
-    }
-
-    public Function getParent() {
-        return parent;
+        parent = function;
     }
 
     public void setLabeled(boolean labeled) {
@@ -35,6 +26,10 @@ public class BasicBlock extends Value {
 
     public boolean isLabeled() {
         return isLabeled;
+    }
+
+    public String getLabel() {
+        return "_" + parent.getName() + "_B" + getName();
     }
 
     public void setName(String name) {
@@ -50,17 +45,13 @@ public class BasicBlock extends Value {
         }
     }
 
-    public void addPred(Label label) {
-        preds.add(label);
-    }
-
-    public boolean isTerminator() {
-        return isTerminator;
-    }
-
     public void setTerminator(Instruction branch) {
         appendInstr(branch, false);
         isTerminator = true;
+    }
+
+    public LinkedList<Instruction> getInstructions() {
+        return instructions;
     }
 
     @Override
@@ -85,8 +76,8 @@ public class BasicBlock extends Value {
         private BasicBlock outBlock;
         private BasicBlock updateBlock;
 
-        public ForBlock(String name, BasicBlock outBlock) {
-            super(name);
+        public ForBlock(String name, BasicBlock outBlock, Function function) {
+            super(name, function);
             this.outBlock = outBlock;
         }
 
