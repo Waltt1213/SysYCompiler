@@ -38,6 +38,14 @@ public class Call extends Instruction {
         return callFunc.isNotVoid();
     }
 
+    public Function getCallFunc() {
+        return callFunc;
+    }
+
+    public ArrayList<Value> getFuncRParams() {
+        return funcRParams;
+    }
+
     public String getCall() {
         StringBuilder sb = new StringBuilder();
         sb.append(callFunc.getTp().toString()).append(" ");

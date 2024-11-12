@@ -7,10 +7,13 @@ public enum MipsInstrType {
     ADD("add"),
     ADDI("addi"),
     ADDU("addu"),
+    ADDIU("addiu"),
     SUB("sub"),
     SUBI("subi"),
     SUBU("subu"),
     SLL("sll"),
+    MULT("mult"),
+    DIV("div"),
     ORI("ori"),
     ANI("andi"),
     OR("or"),
@@ -26,7 +29,8 @@ public enum MipsInstrType {
     JAL("jal"),
     JALR("jalr"),
     JR("jr"),
-    SYSCALL("syscall");
+    SYSCALL("syscall"),
+    NOP("nop");
 
     private final String value;
 

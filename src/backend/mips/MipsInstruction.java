@@ -36,12 +36,19 @@ public class MipsInstruction {
         this.isLabel = true;
     }
 
+    public MipsInstruction(MipsInstrType op) {
+        this.op = op;
+        this.operandNum = 0;
+    }
+
     @Override
     public String toString() {
         if (isLabel) {
             return String.format("%s:", operand1);
         }
-        if (operandNum == 1) {
+        if (operandNum == 0) {
+            return String.format("\t%s", op.toString());
+        } else if (operandNum == 1) {
             return String.format("\t%s %s", op.toString(), operand1);
         } else if (operandNum == 2) {
             return String.format("\t%s %s, %s", op.toString(), operand1, operand2);

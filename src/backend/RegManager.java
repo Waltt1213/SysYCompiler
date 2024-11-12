@@ -18,18 +18,32 @@ public class RegManager {
     }
 
     /**
-     * @param virtualName 虚拟寄存器名称
-     * @return  可用的临时寄存器
+     * @param name 虚拟寄存器名
      */
-    public MipsRegister getRealTempReg(String virtualName) {
-        // t0 -> t7, t8, t9
+    public MipsRegister setTempRegUse(String name) {
         for (int i = 8; i < 18; i++) {
             if (tempUseMap.get(i).isEmpty()) {
-                tempUseMap.put(i, virtualName);
+                tempUseMap.put(i, name);
                 return regPool.get(i);
             }
         }
+        // 没有空的临时寄存器
         return null;
+    }
+
+    /**
+     * @param virtualName 虚拟寄存器名称
+     * @return  可用的临时寄存器
+     */
+    public MipsRegister getTempReg(String virtualName) {
+        // t0 -> t7, t8, t9
+        for (int i = 8; i < 18; i++) {
+            if (tempUseMap.get(i).equals(virtualName)) {
+                return regPool.get(i);
+            }
+        }
+        return setTempRegUse(virtualName);
+
     }
 
     /**
@@ -50,6 +64,9 @@ public class RegManager {
     }
 
     public void resetTempReg(MipsRegister reg) {
+        if (reg.getNo() < 8 || reg.getNo() > 17) {
+            return;
+        }
         tempUseMap.put(reg.getNo(), "");
     }
 

@@ -32,6 +32,10 @@ public class BasicBlock extends Value {
         return "_" + parent.getName() + "_B" + getName();
     }
 
+    public Function getParent() {
+        return parent;
+    }
+
     public void setName(String name) {
         super.setName(name);
     }
