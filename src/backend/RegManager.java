@@ -4,11 +4,12 @@ import backend.mips.MipsRegister;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 
 public class RegManager {
-    public ArrayList<MipsRegister> regPool = new ArrayList<>();
-    public HashMap<Integer, String> tempUseMap = new HashMap<>();    // real -> virtual
-    public HashMap<Integer, String> argumentUseMap = new HashMap<>();   // argue -> virtual
+    private ArrayList<MipsRegister> regPool = new ArrayList<>();
+    private HashMap<Integer, String> tempUseMap = new HashMap<>();    // real -> virtual
+    private HashMap<Integer, String> argumentUseMap = new HashMap<>();   // argue -> virtual
 
     public RegManager() {
         for (int i = 0; i < 32; i++) {
@@ -47,6 +48,18 @@ public class RegManager {
     }
 
     /**
+     * @param virtualName 虚拟寄存器名
+     * @return 逻辑寄存器
+     */
+    public MipsRegister getReg(String virtualName) {
+        MipsRegister res = getArgueReg(virtualName);
+        if (res == null) {
+            return getTempReg(virtualName);
+        }
+        return res;
+    }
+
+    /**
      * @param name 表示函数参数的虚拟寄存器名
      * @param no    逻辑寄存器编号 a0: 4
      */
@@ -54,6 +67,10 @@ public class RegManager {
         argumentUseMap.put(no, name);
     }
 
+    /**
+     * @param name 虚拟寄存器名
+     * @return 参数寄存器
+     */
     public MipsRegister getArgueReg(String name) {
         for (Integer no: argumentUseMap.keySet()) {
             if (argumentUseMap.get(no).equals(name)) {

@@ -1,10 +1,12 @@
 package backend;
 
 import java.util.HashMap;
+import java.util.HashSet;
 
 public class StackManager {
     private int stackPtr;   // 栈顶偏移指针
     private HashMap<String, Integer> stackFrameMap; // 栈帧
+    private HashSet<String> globalDataSet = new HashSet<>();
 
     /**
      * ra <br>
@@ -16,6 +18,14 @@ public class StackManager {
     public StackManager() {
         stackPtr = 0;
         stackFrameMap = new HashMap<>();
+    }
+
+    public void addGlobalData(String data) {
+        globalDataSet.add(data);
+    }
+
+    public boolean isGlobalData(String data) {
+        return globalDataSet.contains(data);
     }
 
     /**
