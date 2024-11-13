@@ -17,7 +17,7 @@ public enum MipsInstrType {
     MFHI("mfhi"),
     MFLO("mflo"),
     ORI("ori"),
-    ANI("andi"),
+    ANDI("andi"),
     OR("or"),
     AND("and"),
     BEQ("beq"),

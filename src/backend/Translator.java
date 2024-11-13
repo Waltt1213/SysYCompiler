@@ -176,8 +176,14 @@ public class Translator {
             genCall((Call) instruction);
         } else if (instruction instanceof BinaryOperator) {
             genBinaryOperator((BinaryOperator) instruction);
+        } else if (instruction instanceof Zext) {
+            genZext((Zext) instruction);
+        } else if (instruction instanceof Trunc) {
+            genTrunc((Trunc) instruction);
         } else if (instruction instanceof Alloca) {
             textSegment.add(new MipsInstruction("# " + instruction));
+        } else if (instruction instanceof GetElementPtr) {
+            genElementPtr((GetElementPtr) instruction);
         }
     }
 
@@ -185,6 +191,17 @@ public class Translator {
         textSegment.add(new MipsInstruction("# " + call.toString()));
         Function function = call.getCallFunc();
         ArrayList<Argument> arguments = function.getFuncFParams();
+        if (function.getName().equals("putstr")) {
+            GetElementPtr getElementPtr = (GetElementPtr) call.getFuncRParams().get(0);
+            textSegment.add(new MipsInstruction(LA, "$a0", getElementPtr.getOperands().get(0).getName()));
+            // 跳转到目标函数
+            textSegment.add(new MipsInstruction(JAL, function.getName()));
+            if (function.isNotVoid()) {
+                MipsRegister ret = regManager.getTempReg(call.getFullName());
+                textSegment.add(new MipsInstruction(MOVE, ret.getName(), "$v0"));
+            }
+            return;
+        }
         // 参数传递
         ArrayList<Value> funcRParams = call.getFuncRParams();
         for (int i = 0; i < funcRParams.size(); i++) {
@@ -222,30 +239,91 @@ public class Translator {
         textSegment.add(new MipsInstruction("# " + store.toString()));
         Value value = store.getOperands().get(0);
         Value addr = store.getOperands().get(1);
+        MipsRegister reg = regManager.getReg(value.getFullName());
+        if (value instanceof Constant) {
+            textSegment.add(new MipsInstruction(LI, reg.getName(), value.getName()));
+        }
         int ptr = 0;
         if ((ptr = stackManager.getVirtualPtr(addr.getFullName())) >= 0) {
-            MipsRegister argue = regManager.getReg(value.getFullName());
-            textSegment.add(new MipsInstruction(SW, argue.getName(), "$sp", String.valueOf(ptr)));
-            regManager.resetTempReg(argue);
+            textSegment.add(new MipsInstruction(SW, reg.getName(), "$sp", String.valueOf(ptr)));
+        } else {
+            if (stackManager.isGlobalData(addr.getFullName())) {    // 全局变量
+                MipsRegister temp0 = regManager.getTempReg(addr.getFullName()); // 加载全局变量地址
+                textSegment.add(new MipsInstruction(LA, temp0.getName(), addr.getName()));
+                textSegment.add(new MipsInstruction(SW, reg.getName(), temp0.getName(), "0"));
+            } else {
+                MipsRegister temp0 = regManager.getReg(addr.getFullName());
+                textSegment.add(new MipsInstruction(SW, reg.getName(), temp0.getName(), "0"));
+            }
         }
+        regManager.resetTempReg(reg);
     }
 
     public void genLoad(Load load) {
         textSegment.add(new MipsInstruction("# " + load.toString()));
         Value addr = load.getOperands().get(0);
         int ptr = stackManager.getVirtualPtr(addr.getFullName());
-        if (ptr >= 0) {
+        if (ptr >= 0) { // 临时变量
             MipsRegister temp = regManager.getTempReg(load.getFullName()); // load到临时寄存器
             textSegment.add(new MipsInstruction(LW, temp.getName(), "$sp", String.valueOf(ptr)));
         } else {
-            if (stackManager.isGlobalData(addr.getFullName())) {
+            if (stackManager.isGlobalData(addr.getFullName())) {    // 全局变量
                 MipsRegister temp0 = regManager.getTempReg(addr.getFullName()); // 加载全局变量地址
                 textSegment.add(new MipsInstruction(LA, temp0.getName(), addr.getName()));
                 MipsRegister temp = regManager.getTempReg(load.getFullName()); // load到临时寄存器
                 textSegment.add(new MipsInstruction(LW, temp.getName(), temp0.getName(), "0"));
                 regManager.resetTempReg(temp0);
+            } else {
+                MipsRegister temp0 = regManager.getReg(addr.getFullName());
+                MipsRegister temp = regManager.getTempReg(load.getFullName()); // load到临时寄存器
+                textSegment.add(new MipsInstruction(LW, temp.getName(), temp0.getName(), "0"));
+                regManager.resetTempReg(temp0);
             }
         }
+    }
+
+    public void genElementPtr(GetElementPtr getElementPtr) {    // 计算地址
+        textSegment.add(new MipsInstruction("# " + getElementPtr.toString()));
+        Value firstAddr = getElementPtr.getOperands().get(0);   // 可能来自reg，也可能来自栈
+        Value bis1 = getElementPtr.getOperands().get(1);
+        int ptr = Integer.parseInt(bis1.getName()); // 指针初始化
+        int firstPtr = stackManager.getVirtualPtr(firstAddr.getFullName());
+        MipsRegister first;
+        // 获取首地址
+        if (firstPtr >= 0) {    // 来自栈
+            first = regManager.getReg(29);
+            ptr += firstPtr;
+        } else {
+            if (stackManager.isGlobalData(firstAddr.getFullName())) {
+                first = regManager.getTempReg(firstAddr.getFullName()); // 加载全局变量地址
+                textSegment.add(new MipsInstruction(LA, first.getName(), firstAddr.getName())); // 首地址为全局变量地址
+            } else {
+                first = regManager.getReg(firstAddr.getFullName());
+            }
+        }
+        if (getElementPtr.getOperands().size() > 2) {
+            Value bis2 = getElementPtr.getOperands().get(2);
+            if (bis2 instanceof Constant) {
+                ptr += Integer.parseInt(bis2.getName());
+                MipsRegister ptrReg = regManager.getTempReg(getElementPtr.getFullName());
+                textSegment.add(new MipsInstruction(ADDIU, ptrReg.getName(), first.getName(), String.valueOf(ptr * 4)));
+            } else {
+                MipsRegister temp = regManager.getReg(bis2.getFullName());
+                // 先乘4
+                MipsRegister temp1 = regManager.getTempReg(temp.getName());
+                textSegment.add(new MipsInstruction(SLL, temp1.getName(), temp.getName(), String.valueOf(2)));
+                MipsRegister bis = regManager.getTempReg(getElementPtr.getFullName());
+                textSegment.add(new MipsInstruction(ADDIU, bis.getName(), temp1.getName(), String.valueOf(ptr * 4)));
+                regManager.resetTempReg(temp);
+                regManager.resetTempReg(temp1);
+                MipsRegister ptrReg = regManager.getTempReg(getElementPtr.getFullName());
+                textSegment.add(new MipsInstruction(ADDU, ptrReg.getName(), first.getName(), bis.getName()));
+            }
+        } else {
+            MipsRegister ptrReg = regManager.getTempReg(getElementPtr.getFullName());
+            textSegment.add(new MipsInstruction(ADDIU, ptrReg.getName(), first.getName(), String.valueOf(ptr * 4)));
+        }
+        regManager.resetTempReg(first);
     }
 
     public void genReturn(Return ret, boolean isMain) {
@@ -376,6 +454,20 @@ public class Translator {
         } else {
             textSegment.add(new MipsInstruction(MFHI, temp.getName()));
         }
+    }
+
+    public void genTrunc(Trunc trunc) {
+        Value op1 = trunc.getOperands().get(0);
+        MipsRegister reg = regManager.getReg(op1.getFullName());
+        MipsRegister temp = regManager.getTempReg(trunc.getFullName());
+        textSegment.add(new MipsInstruction(ANDI, temp.getName(), reg.getName(), "0xFF"));
+    }
+
+    public void genZext(Zext zext) {
+        Value op1 = zext.getOperands().get(0);
+        MipsRegister reg = regManager.getReg(op1.getFullName());
+        MipsRegister temp = regManager.getTempReg(zext.getFullName());
+        textSegment.add(new MipsInstruction(ANDI, temp.getName(), reg.getName(), "0xFF"));
     }
 
     public ArrayList<MipsDataSeg> getDataSegment() {

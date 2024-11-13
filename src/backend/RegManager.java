@@ -59,6 +59,10 @@ public class RegManager {
         return res;
     }
 
+    public MipsRegister getReg(int no) {
+        return regPool.get(no);
+    }
+
     /**
      * @param name 表示函数参数的虚拟寄存器名
      * @param no    逻辑寄存器编号 a0: 4

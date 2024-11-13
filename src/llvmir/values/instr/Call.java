@@ -23,7 +23,7 @@ public class Call extends Instruction {
     }
 
     public void setName(String name) {
-        this.name = name;
+        super.setName(name);
     }
 
     public void setFuncRParams(ArrayList<Value> funcRParams) {
