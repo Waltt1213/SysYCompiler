@@ -20,6 +20,7 @@ public class Translator {
     private ArrayList<MipsInstruction> textSegment;
     private final RegManager regManager = new RegManager();
     private final StackManager stackManager = new StackManager();
+    private BasicBlock curBlock;
 
     public Translator(Module module) {
         this.module = module;
@@ -60,14 +61,20 @@ public class Translator {
         // 添加函数标签
         MipsInstruction label = new MipsInstruction(declare.getName());
         textSegment.add(label);
-        if (declare.getName().equals("putch") || declare.getName().equals("putint")) {
+        if (declare.getName().equals("putint")) {
             textSegment.add(new MipsInstruction(LI, "$v0", "1"));
+        }
+        if (declare.getName().equals("putch")) {
+            textSegment.add(new MipsInstruction(LI, "$v0", "11"));
         }
         if (declare.getName().equals("putstr")) {
             textSegment.add(new MipsInstruction(LI, "$v0", "4"));
         }
-        if (declare.getName().equals("getint") || declare.getName().equals("getchar")) {
+        if (declare.getName().equals("getint")) {
             textSegment.add(new MipsInstruction(LI, "$v0", "5"));
+        }
+        if (declare.getName().equals("getchar")) {
+            textSegment.add(new MipsInstruction(LI, "$v0", "12"));
         }
         textSegment.add(new MipsInstruction(SYSCALL, ""));
         textSegment.add(new MipsInstruction(JR, "$ra"));
@@ -79,6 +86,7 @@ public class Translator {
         allocStackFrame(function);
         // TODO: 如果是非叶子函数，则需要将a0->a3压栈
         for (BasicBlock basicBlock: function.getBasicBlocks()) {
+            curBlock = basicBlock;
             genBasicBlock(basicBlock);
         }
         // 函数尾声
@@ -104,10 +112,10 @@ public class Translator {
         // 记录参数映射
         allocArguments(function);
         // 记录save reg映射
-//        for (int i = 18; i < 26; i++) {
-//            stackManager.putVirtualReg("$s" + (i - 18), 4);
-//            size += 4;
-//        }
+        for (int i = 0; i < 10; i++) {
+            stackManager.putVirtualReg("$t" + i, 4);
+            size += 4;
+        }
         // 保存local var: MIPS在保存局部变量时，遵循的顺序是：先定义的变量后入栈
         size += saveLocalVariables(function);
         // 保存fp, ra
@@ -184,6 +192,10 @@ public class Translator {
             textSegment.add(new MipsInstruction("# " + instruction));
         } else if (instruction instanceof GetElementPtr) {
             genElementPtr((GetElementPtr) instruction);
+        } else if (instruction instanceof Compare) {
+            textSegment.add(new MipsInstruction("# " + instruction));
+        } else if (instruction instanceof Branch) {
+            genBranch((Branch) instruction);
         }
     }
 
@@ -227,11 +239,27 @@ public class Translator {
                 }
             }
         }
+        // 保存现场
+        HashMap<Integer, String> unused = regManager.unusedMap();
+        for (Map.Entry<Integer, String> entry: unused.entrySet()) {
+            MipsRegister tempReg = regManager.getReg(entry.getKey());
+            int ptr = stackManager.getVirtualPtr(tempReg.getName());
+            textSegment.add(new MipsInstruction(SW, tempReg.getName(), "$sp", String.valueOf(ptr)));
+        }
         // 跳转到目标函数
         textSegment.add(new MipsInstruction(JAL, function.getName()));
+        textSegment.add(new MipsInstruction(NOP));
         if (function.isNotVoid()) {
             MipsRegister ret = regManager.getTempReg(call.getFullName());
             textSegment.add(new MipsInstruction(MOVE, ret.getName(), "$v0"));
+        }
+        // 恢复现场
+        HashMap<Integer, String> restoreMap = regManager.getRestoreMap();
+        for (Map.Entry<Integer, String> entry: restoreMap.entrySet()) {
+            MipsRegister temp = regManager.getReg(entry.getKey());
+            int ptr = stackManager.getVirtualPtr(temp.getName());
+            textSegment.add(new MipsInstruction(LW,temp.getName(), "$sp", String.valueOf(ptr)));
+            regManager.getTempUseMap().put(entry.getKey(), entry.getValue());
         }
     }
 
@@ -457,17 +485,110 @@ public class Translator {
     }
 
     public void genTrunc(Trunc trunc) {
+        textSegment.add(new MipsInstruction("# " + trunc));
         Value op1 = trunc.getOperands().get(0);
         MipsRegister reg = regManager.getReg(op1.getFullName());
         MipsRegister temp = regManager.getTempReg(trunc.getFullName());
         textSegment.add(new MipsInstruction(ANDI, temp.getName(), reg.getName(), "0xFF"));
+        regManager.resetTempReg(reg);
     }
 
     public void genZext(Zext zext) {
+        textSegment.add(new MipsInstruction("# " + zext));
         Value op1 = zext.getOperands().get(0);
         MipsRegister reg = regManager.getReg(op1.getFullName());
         MipsRegister temp = regManager.getTempReg(zext.getFullName());
         textSegment.add(new MipsInstruction(ANDI, temp.getName(), reg.getName(), "0xFF"));
+        regManager.resetTempReg(reg);
+    }
+
+    public void genBranch(Branch branch) {
+        textSegment.add(new MipsInstruction("# " + branch));
+        if (branch.getOperands().size() == 1) { // 直接跳转
+            textSegment.add(new MipsInstruction(J, ((BasicBlock) branch.getOperands().get(0)).getLabel()));
+            textSegment.add(new MipsInstruction(NOP));
+            return;
+        }
+        Compare judge = (Compare) branch.getOperands().get(0);
+        BasicBlock trueBranch = (BasicBlock) branch.getOperands().get(1);
+        BasicBlock falseBranch = (BasicBlock) branch.getOperands().get(2);
+        if (curBlock.getDirect().getName().equals(falseBranch.getName())) {  // 直接后继是trueBranch
+            genIcmpInstr(judge, trueBranch);
+        } else {
+            Compare compare = reverseIcmp(judge);
+            genIcmpInstr(compare, falseBranch);
+        }
+    }
+
+    public void genIcmpInstr(Compare judge, BasicBlock target) {
+        Value value1 = judge.getOperands().get(0);
+        Value value2 = judge.getOperands().get(1);
+        MipsRegister op1 = regManager.getReg(value1.getFullName());
+        MipsRegister op2 = regManager.getReg(value2.getFullName());
+        if (value1 instanceof Constant) {
+            textSegment.add(new MipsInstruction(LI, op1.getName(), value1.getName()));
+        }
+        if (value2 instanceof Constant) {
+            textSegment.add(new MipsInstruction(LI, op2.getName(), value2.getName()));
+        }
+        MipsInstruction branch;
+        switch (judge.getCondType()) {
+            case NE:
+                branch = new MipsInstruction(BNE, op1.getName(), op2.getName(), target.getLabel());
+                break;
+            case EQ:
+                branch = new MipsInstruction(BEQ, op1.getName(), op2.getName(), target.getLabel());
+                break;
+            case SGE:
+                branch = new MipsInstruction(BGE, op1.getName(), op2.getName(), target.getLabel());
+                break;
+            case SLE:
+                branch = new MipsInstruction(BLE, op1.getName(), op2.getName(), target.getLabel());
+                break;
+            case SGT:
+                branch = new MipsInstruction(BGT, op1.getName(), op2.getName(), target.getLabel());
+                break;
+            case SLT:
+                branch = new MipsInstruction(BLT, op1.getName(), op2.getName(), target.getLabel());
+                break;
+            default:
+                branch = new MipsInstruction(NOP);
+        }
+        textSegment.add(branch);
+        textSegment.add(new MipsInstruction(NOP));
+        regManager.resetTempReg(op1);
+        regManager.resetTempReg(op2);
+    }
+
+    public Compare reverseIcmp(Compare compare) {
+        Compare reverse;
+        switch (compare.getCondType()) {
+            case NE:
+                reverse = new Compare(compare.getName(), Compare.CondType.EQ);
+                break;
+            case EQ:
+                reverse = new Compare(compare.getName(), Compare.CondType.NE);
+                break;
+            case SGE:
+                reverse = new Compare(compare.getName(), Compare.CondType.SLT);
+                break;
+            case SLE:
+                reverse = new Compare(compare.getName(), Compare.CondType.SGT);
+                break;
+            case SGT:
+                reverse = new Compare(compare.getName(), Compare.CondType.SLE);
+                break;
+            case SLT:
+                reverse = new Compare(compare.getName(), Compare.CondType.SGE);
+                break;
+            default:
+                reverse = compare;
+        }
+        if (!reverse.equals(compare)) {
+            reverse.addOperands(compare.getOperands().get(0));
+            reverse.addOperands(compare.getOperands().get(1));
+        }
+        return reverse;
     }
 
     public ArrayList<MipsDataSeg> getDataSegment() {
@@ -482,9 +603,6 @@ public class Translator {
         if (isString) {
             return ".asciiz";
         }
-        if (dataType == ValueType.DataType.Integer32Ty) {
-            return ".word";
-        }
-        return ".byte";
+        return ".word";
     }
 }

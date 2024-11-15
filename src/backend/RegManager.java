@@ -4,17 +4,19 @@ import backend.mips.MipsRegister;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.Map;
 
 public class RegManager {
     private ArrayList<MipsRegister> regPool = new ArrayList<>();
     private HashMap<Integer, String> tempUseMap = new HashMap<>();    // real -> virtual
     private HashMap<Integer, String> argumentUseMap = new HashMap<>();   // argue -> virtual
+    private HashMap<Integer, String> restoreMap;
 
     public RegManager() {
         for (int i = 0; i < 32; i++) {
             regPool.add(new MipsRegister(i));
             tempUseMap.put(i, "");
+            argumentUseMap.put(i, "");
         }
     }
 
@@ -45,6 +47,25 @@ public class RegManager {
         }
         return setTempRegUse(virtualName);
 
+    }
+
+    public HashMap<Integer, String> unusedMap() {
+        HashMap<Integer, String> unused = new HashMap<>();
+        for (Map.Entry<Integer, String> entry: tempUseMap.entrySet()) {
+            if (!entry.getValue().isEmpty()) {
+                unused.put(entry.getKey(), entry.getValue());
+            }
+        }
+        setRestoreMap(unused);
+        return unused;
+    }
+
+    public void setRestoreMap(HashMap<Integer, String> restoreMap) {
+        this.restoreMap = restoreMap;
+    }
+
+    public HashMap<Integer, String> getRestoreMap() {
+        return restoreMap;
     }
 
     /**
@@ -94,6 +115,11 @@ public class RegManager {
     public void clear() {
         for (int i = 0; i < 32; i++) {
             tempUseMap.put(i, "");
+            argumentUseMap.put(i, "");
         }
+    }
+
+    public HashMap<Integer, String> getTempUseMap() {
+        return tempUseMap;
     }
 }

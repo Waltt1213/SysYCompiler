@@ -475,6 +475,7 @@ public class Visitor {
         Function getint = module.getDeclare("getint");
         if (getint == null) {
             getint = new Function(new ValueType.Type(Integer32Ty), "getint", false);
+            getint.setNotVoid(true);
             module.addDeclare(getint);
         }
         Call call = new Call("", getint);
@@ -490,6 +491,7 @@ public class Visitor {
         Function getchar = module.getDeclare("getchar");
         if (getchar == null) {
             getchar = new Function(new ValueType.Type(Integer32Ty), "getchar", false);
+            getchar.setNotVoid(true);
             module.addDeclare(getchar);
         }
         Call call = new Call("", getchar);

@@ -10,6 +10,10 @@ public class Compare extends Instruction {
         condType = type;
     }
 
+    public CondType getCondType() {
+        return condType;
+    }
+
     public enum CondType {
         SGT("sgt"),
         SLT("slt"),

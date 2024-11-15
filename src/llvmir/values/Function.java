@@ -1,24 +1,22 @@
 package llvmir.values;
 
-import llvmir.Module;
 import llvmir.Value;
 import llvmir.ValueType;
 import llvmir.values.instr.Return;
 
 import java.util.ArrayList;
-import java.util.LinkedList;
 
 public class Function extends Value {
     private ArrayList<Argument> funcFParams;
-    private LinkedList<BasicBlock> basicBlocks;
-    private boolean isDefine;
+    private ArrayList<BasicBlock> basicBlocks;
+    private final boolean isDefine;
     private boolean isNotVoid;
     private boolean isReturn;
 
     public Function(ValueType.Type vt, String name,
                     boolean isDefine) {
         super(vt, name);
-        basicBlocks = new LinkedList<>();
+        basicBlocks = new ArrayList<>();
         funcFParams = new ArrayList<>();
         this.isDefine = isDefine;
         isNotVoid = false;
@@ -35,6 +33,11 @@ public class Function extends Value {
     }
 
     public void addBasicBlock(BasicBlock basicBlock) {
+        if (!basicBlocks.isEmpty()) {
+            BasicBlock last = basicBlocks.get(basicBlocks.size() - 1);
+            basicBlock.addPreBlock(last);
+            last.setDirect(basicBlock);
+        }
         basicBlocks.add(basicBlock);
     }
 
@@ -50,7 +53,7 @@ public class Function extends Value {
         return funcFParams;
     }
 
-    public LinkedList<BasicBlock> getBasicBlocks() {
+    public ArrayList<BasicBlock> getBasicBlocks() {
         return basicBlocks;
     }
 

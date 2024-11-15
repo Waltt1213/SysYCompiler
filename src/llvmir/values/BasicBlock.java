@@ -13,6 +13,9 @@ public class BasicBlock extends Value {
     private final Function parent;
     private boolean isLabeled;
     private boolean isTerminator;
+    private ArrayList<BasicBlock> subsequents = new ArrayList<>();
+    private ArrayList<BasicBlock> precursor = new ArrayList<>();
+    private BasicBlock direct;
 
     public BasicBlock(String name, Function function) {
         super(new ValueType.Type(ValueType.DataType.LabelTy), name);
@@ -38,6 +41,23 @@ public class BasicBlock extends Value {
 
     public void setName(String name) {
         super.setName(name);
+    }
+
+    public void addPreBlock(BasicBlock basicBlock) {
+        precursor.add(basicBlock);  // basicBlock -> this
+        basicBlock.addSubBlock(this);
+    }
+
+    public void addSubBlock(BasicBlock basicBlock) {
+        subsequents.add(basicBlock);
+    }
+
+    public void setDirect(BasicBlock basicBlock) {
+        direct = basicBlock;
+    }
+
+    public BasicBlock getDirect() {
+        return direct;
     }
 
     public void appendInstr(Instruction instr, boolean setName) {
