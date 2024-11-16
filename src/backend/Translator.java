@@ -21,6 +21,7 @@ public class Translator {
     private final RegManager regManager = new RegManager();
     private final StackManager stackManager = new StackManager();
     private BasicBlock curBlock;
+    private int maxParams = 0;
 
     public Translator(Module module) {
         this.module = module;
@@ -47,6 +48,7 @@ public class Translator {
 
     public void genTextSegment() {
         ArrayList<Function> functions = module.getFunctions();
+        calMaxParam(functions);
         Collections.reverse(functions); // 翻转list,先解析main
         for (Function function: functions) {
             genFunction(function);
@@ -54,6 +56,15 @@ public class Translator {
         HashMap<String, Function> declares = module.getDeclares();
         for (Function declare: declares.values()) {
             genDeclare(declare);
+        }
+    }
+
+    public void calMaxParam(ArrayList<Function> functions) {
+        for (Function function: functions) {
+            int num = function.getArgc();
+            if (num > maxParams) {
+                maxParams = num;
+            }
         }
     }
 
@@ -129,6 +140,10 @@ public class Translator {
         int ptrRa = stackManager.putVirtualReg("$ra", 4);
         textSegment.add(new MipsInstruction(SW, "$ra", "$sp", String.valueOf(ptrRa)));
         textSegment.add(new MipsInstruction(SW, "$fp", "$sp", String.valueOf(ptrFp)));
+        // 调用者的传参在栈中位置构建字典
+        for (Argument funcFParam : function.getFuncFParams()) {
+            stackManager.putVirtualReg(funcFParam.getFullName(), 4);
+        }
     }
 
     public void allocArguments(Function function) {
@@ -138,8 +153,8 @@ public class Translator {
             regManager.setArgueRegUse(funcFParams.get(i).getFullName(), 4 + i);
         }
         // 记录argument->ptr映射
-        for (Argument funcFParam : funcFParams) {
-            stackManager.putVirtualReg(funcFParam.getFullName(), 4);
+        for (int i = 0; i < maxParams; i++) {
+            stackManager.putVirtualReg("$a" + i, 4); // TODO
         }
     }
 
@@ -157,10 +172,6 @@ public class Translator {
                     localVarSize += size;
                     // 将local Var在栈空间的位置确定，暂时不填值
                     stackManager.putVirtualReg(alloca.getFullName(), size);
-                } else if (instruction instanceof BinaryOperator) {
-                    BinaryOperator operator = (BinaryOperator) instruction;
-                    localVarSize += 4;
-                    stackManager.putVirtualReg(operator.getFullName(), 4);
                 }
             }
         }
@@ -227,15 +238,17 @@ public class Translator {
                     String constVar = value.getName();
                     textSegment.add(new MipsInstruction(LI, "$a" + i, constVar));
                 } else {
-                    MipsRegister argue = regManager.getTempReg(value.getFullName());
+                    MipsRegister argue = regManager.getReg(value.getFullName());
                     textSegment.add(new MipsInstruction(ADDU, "$a" + i, "$zero", argue.getName()));
                     regManager.resetTempReg(argue);
                 }
             } else {
-                int ptr = stackManager.getVirtualPtr(arguments.get(i).getFullName());
+                int ptr = stackManager.getVirtualPtr("$a" + i);
                 if (value instanceof Constant) {
-                    String constVar = value.getName();
-                    textSegment.add(new MipsInstruction(SW, constVar, "$sp", String.valueOf(ptr)));
+                    MipsRegister temp = regManager.setTempRegUse(value.getFullName());
+                    textSegment.add(new MipsInstruction(LI, temp.getName(), value.getName()));
+                    textSegment.add(new MipsInstruction(SW, temp.getName(), "$sp", String.valueOf(ptr)));
+                    regManager.resetTempReg(temp);
                 } else {
                     MipsRegister argue = regManager.getTempReg(value.getFullName());
                     textSegment.add(new MipsInstruction(SW, argue.getName(), "$sp", String.valueOf(ptr)));
