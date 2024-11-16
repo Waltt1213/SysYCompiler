@@ -21,6 +21,10 @@ public class Value {
         usersList.add(user);
     }
 
+    public ArrayList<User> getUsersList() {
+        return usersList;
+    }
+
     public String getName() {
         return name;
     }

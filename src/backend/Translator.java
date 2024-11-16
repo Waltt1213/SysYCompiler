@@ -157,6 +157,10 @@ public class Translator {
                     localVarSize += size;
                     // 将local Var在栈空间的位置确定，暂时不填值
                     stackManager.putVirtualReg(alloca.getFullName(), size);
+                } else if (instruction instanceof BinaryOperator) {
+                    BinaryOperator operator = (BinaryOperator) instruction;
+                    localVarSize += 4;
+                    stackManager.putVirtualReg(operator.getFullName(), 4);
                 }
             }
         }
@@ -275,13 +279,17 @@ public class Translator {
         if ((ptr = stackManager.getVirtualPtr(addr.getFullName())) >= 0) {
             textSegment.add(new MipsInstruction(SW, reg.getName(), "$sp", String.valueOf(ptr)));
         } else {
+            MipsRegister temp0;
             if (stackManager.isGlobalData(addr.getFullName())) {    // 全局变量
-                MipsRegister temp0 = regManager.getTempReg(addr.getFullName()); // 加载全局变量地址
+                temp0 = regManager.getTempReg(addr.getFullName()); // 加载全局变量地址
                 textSegment.add(new MipsInstruction(LA, temp0.getName(), addr.getName()));
                 textSegment.add(new MipsInstruction(SW, reg.getName(), temp0.getName(), "0"));
             } else {
-                MipsRegister temp0 = regManager.getReg(addr.getFullName());
+                temp0 = regManager.getReg(addr.getFullName());
                 textSegment.add(new MipsInstruction(SW, reg.getName(), temp0.getName(), "0"));
+            }
+            if (addr.getUsersList().size() == 1) {
+                regManager.resetTempReg(temp0);
             }
         }
         regManager.resetTempReg(reg);
@@ -314,7 +322,7 @@ public class Translator {
         textSegment.add(new MipsInstruction("# " + getElementPtr.toString()));
         Value firstAddr = getElementPtr.getOperands().get(0);   // 可能来自reg，也可能来自栈
         Value bis1 = getElementPtr.getOperands().get(1);
-        int ptr = Integer.parseInt(bis1.getName()); // 指针初始化
+        int ptr = 0;
         int firstPtr = stackManager.getVirtualPtr(firstAddr.getFullName());
         MipsRegister first;
         // 获取首地址
@@ -329,19 +337,28 @@ public class Translator {
                 first = regManager.getReg(firstAddr.getFullName());
             }
         }
+        if (bis1 instanceof Constant) {
+            ptr += Integer.parseInt(bis1.getName()) * 4; // 指针初始化
+        } else {
+            MipsRegister temp = regManager.getReg(bis1.getFullName());
+            MipsRegister temp1 = regManager.getTempReg("*4");
+            textSegment.add(new MipsInstruction(SLL, temp1.getName(), temp.getName(), String.valueOf(2)));
+            textSegment.add(new MipsInstruction(ADDU, first.getName(), first.getName(), temp1.getName()));
+            regManager.resetTempReg(temp1);
+        }
         if (getElementPtr.getOperands().size() > 2) {
             Value bis2 = getElementPtr.getOperands().get(2);
             if (bis2 instanceof Constant) {
-                ptr += Integer.parseInt(bis2.getName());
+                ptr += Integer.parseInt(bis2.getName()) * 4;
                 MipsRegister ptrReg = regManager.getTempReg(getElementPtr.getFullName());
-                textSegment.add(new MipsInstruction(ADDIU, ptrReg.getName(), first.getName(), String.valueOf(ptr * 4)));
+                textSegment.add(new MipsInstruction(ADDIU, ptrReg.getName(), first.getName(), String.valueOf(ptr)));
             } else {
                 MipsRegister temp = regManager.getReg(bis2.getFullName());
                 // 先乘4
-                MipsRegister temp1 = regManager.getTempReg(temp.getName());
+                MipsRegister temp1 = regManager.getTempReg("*4");
                 textSegment.add(new MipsInstruction(SLL, temp1.getName(), temp.getName(), String.valueOf(2)));
                 MipsRegister bis = regManager.getTempReg(getElementPtr.getFullName());
-                textSegment.add(new MipsInstruction(ADDIU, bis.getName(), temp1.getName(), String.valueOf(ptr * 4)));
+                textSegment.add(new MipsInstruction(ADDIU, bis.getName(), temp1.getName(), String.valueOf(ptr)));
                 regManager.resetTempReg(temp);
                 regManager.resetTempReg(temp1);
                 MipsRegister ptrReg = regManager.getTempReg(getElementPtr.getFullName());
@@ -349,7 +366,7 @@ public class Translator {
             }
         } else {
             MipsRegister ptrReg = regManager.getTempReg(getElementPtr.getFullName());
-            textSegment.add(new MipsInstruction(ADDIU, ptrReg.getName(), first.getName(), String.valueOf(ptr * 4)));
+            textSegment.add(new MipsInstruction(ADDIU, ptrReg.getName(), first.getName(), String.valueOf(ptr)));
         }
         regManager.resetTempReg(first);
     }
@@ -506,6 +523,16 @@ public class Translator {
         textSegment.add(new MipsInstruction("# " + branch));
         if (branch.getOperands().size() == 1) { // 直接跳转
             textSegment.add(new MipsInstruction(J, ((BasicBlock) branch.getOperands().get(0)).getLabel()));
+            textSegment.add(new MipsInstruction(NOP));
+            return;
+        }
+        Value cond = branch.getOperands().get(0);
+        if (cond instanceof Constant) {
+            if (cond.getName().equals("0")) {
+                textSegment.add(new MipsInstruction(J, ((BasicBlock) branch.getOperands().get(2)).getLabel()));
+            } else {
+                textSegment.add(new MipsInstruction(J, ((BasicBlock) branch.getOperands().get(1)).getLabel()));
+            }
             textSegment.add(new MipsInstruction(NOP));
             return;
         }
