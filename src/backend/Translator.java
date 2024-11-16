@@ -118,7 +118,7 @@ public class Translator {
      */
     public void allocStackFrame(Function function) {
         // TODO： 当前方法只压入了 ra 和 fp
-        int size = function.getFuncFParams().size() * 4;
+        int size = maxParams * 4;
         // 从栈顶到栈底记录映射，依次为 argument, save reg， local var, fp, ra
         // 记录参数映射
         allocArguments(function);
@@ -141,8 +141,12 @@ public class Translator {
         textSegment.add(new MipsInstruction(SW, "$ra", "$sp", String.valueOf(ptrRa)));
         textSegment.add(new MipsInstruction(SW, "$fp", "$sp", String.valueOf(ptrFp)));
         // 调用者的传参在栈中位置构建字典
-        for (Argument funcFParam : function.getFuncFParams()) {
-            stackManager.putVirtualReg(funcFParam.getFullName(), 4);
+        for (int i = 0; i < function.getArgc(); i++) {
+            if (i > 3) {
+                stackManager.putVirtualReg(function.getFuncFParams().get(i).getFullName(), 4);
+            } else {
+                stackManager.addPtr(4);
+            }
         }
     }
 
@@ -290,6 +294,10 @@ public class Translator {
         }
         int ptr = 0;
         if ((ptr = stackManager.getVirtualPtr(addr.getFullName())) >= 0) {
+            if (value instanceof Argument && Integer.parseInt(value.getName()) > 3) {
+                int arguePtr = stackManager.getVirtualPtr(value.getFullName());
+                textSegment.add(new MipsInstruction(LW, reg.getName(), "$sp", String.valueOf(arguePtr)));
+            }
             textSegment.add(new MipsInstruction(SW, reg.getName(), "$sp", String.valueOf(ptr)));
         } else {
             MipsRegister temp0;

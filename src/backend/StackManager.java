@@ -48,6 +48,10 @@ public class StackManager {
         return stackPtr;
     }
 
+    public void addPtr(int size) {
+        stackPtr += size;
+    }
+
     public int getVirtualPtr(String name) {
         if (!stackFrameMap.containsKey(name)) {
             return -1;
