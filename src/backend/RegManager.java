@@ -106,6 +106,9 @@ public class RegManager {
     }
 
     public void resetTempReg(MipsRegister reg) {
+        if (reg == null) {
+            return;
+        }
         if (reg.getNo() < 8 || reg.getNo() > 17) {
             return;
         }
