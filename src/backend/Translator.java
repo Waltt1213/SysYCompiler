@@ -213,6 +213,7 @@ public class Translator {
             genElementPtr((GetElementPtr) instruction);
         } else if (instruction instanceof Compare) {
             textSegment.add(new MipsInstruction("# " + instruction));
+            genCompare((Compare) instruction);
         } else if (instruction instanceof Branch) {
             genBranch((Branch) instruction);
         }
@@ -564,14 +565,14 @@ public class Translator {
         BasicBlock trueBranch = (BasicBlock) branch.getOperands().get(1);
         BasicBlock falseBranch = (BasicBlock) branch.getOperands().get(2);
         if (curBlock.getDirect().getName().equals(falseBranch.getName())) {  // 直接后继是trueBranch
-            genIcmpInstr(judge, trueBranch);
+            genBranchInstr(judge, trueBranch);
         } else {
             Compare compare = reverseIcmp(judge);
-            genIcmpInstr(compare, falseBranch);
+            genBranchInstr(compare, falseBranch);
         }
     }
 
-    public void genIcmpInstr(Compare judge, BasicBlock target) {
+    public void genBranchInstr(Compare judge, BasicBlock target) {
         Value value1 = judge.getOperands().get(0);
         Value value2 = judge.getOperands().get(1);
         MipsRegister op1 = regManager.getReg(value1.getFullName());
@@ -640,6 +641,74 @@ public class Translator {
             reverse.addOperands(compare.getOperands().get(1));
         }
         return reverse;
+    }
+
+    public void genCompare(Compare compare) {
+        for (Value user: compare.getUsersList()) {
+            if (user instanceof Zext) { // 说明参与运算，需要分配寄存器
+                Value value1 = compare.getOperands().get(0);
+                Value value2 = compare.getOperands().get(1);
+                MipsRegister temp = regManager.getReg(user.getFullName());
+                MipsRegister op1;
+                MipsRegister op2;
+                if (value1 instanceof Constant) {
+                    if (value1.getName().equals("0")) {
+                        op1 = regManager.getReg(0);
+                    } else {
+                        op1 = regManager.setTempRegUse("compare1");
+                        textSegment.add(new MipsInstruction(LI, op1.getName(), value1.getName()));
+                    }
+                } else {
+                    op1 = regManager.getReg(value1.getFullName());
+                }
+                if (value2 instanceof Constant) {
+                    if (value2.getName().equals("0")) {
+                        op2 = regManager.getReg(0);
+                    } else {
+                        op2 = regManager.setTempRegUse("compare2");
+                        textSegment.add(new MipsInstruction(LI, op2.getName(), value2.getName()));
+                    }
+                } else {
+                    op2 = regManager.getReg(value2.getFullName());
+                }
+                genIcmpInstr(compare.getCondType(), temp, op1, op2);
+            }
+        }
+    }
+
+    public void genIcmpInstr(Compare.CondType type, MipsRegister temp, MipsRegister op1, MipsRegister op2) {
+        MipsInstruction compare;
+        switch (type) {
+            case NE:
+                compare = new MipsInstruction(SNE, temp.getName(), op1.getName(), op2.getName());
+                break;
+            case EQ:
+                compare = new MipsInstruction(SEQ, temp.getName(), op1.getName(), op2.getName());
+                break;
+            case SGE:   // >= 就是 < 再取反
+                MipsRegister temp0 = regManager.setTempRegUse("compareTemp");
+                textSegment.add(new MipsInstruction(SLT, temp0.getName(), op1.getName(), op2.getName()));
+                compare = new MipsInstruction(SEQ, temp.getName(), temp0.getName(), "$zero");
+                regManager.resetTempReg(temp0);
+                break;
+            case SLE:   // <= 就是 > 再取反
+                MipsRegister temp1 = regManager.setTempRegUse("compareTemp");
+                textSegment.add(new MipsInstruction(SLT, temp1.getName(), op2.getName(), op1.getName()));
+                compare = new MipsInstruction(SEQ, temp.getName(), temp1.getName(), "$zero");
+                regManager.resetTempReg(temp1);
+                break;
+            case SGT:   // > 就是交换操作数的 <
+                compare = new MipsInstruction(SLT, temp.getName(), op2.getName(), op1.getName());
+                break;
+            case SLT:
+                compare = new MipsInstruction(SLT, temp.getName(), op1.getName(), op2.getName());
+                break;
+            default:
+                compare = new MipsInstruction(NOP);
+        }
+        textSegment.add(compare);
+        regManager.resetTempReg(op1);
+        regManager.resetTempReg(op2);
     }
 
     public ArrayList<MipsDataSeg> getDataSegment() {

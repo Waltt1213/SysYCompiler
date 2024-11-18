@@ -20,6 +20,11 @@ public enum MipsInstrType {
     ANDI("andi"),
     OR("or"),
     AND("and"),
+    SLT("slt"),
+    SLTI("slti"),
+    SEQ("seq"),
+    SNE("sne"),
+
     BEQ("beq"),
     BNE("bne"),
     BLT("blt"),
