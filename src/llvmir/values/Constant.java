@@ -3,6 +3,8 @@ package llvmir.values;
 import llvmir.Value;
 import llvmir.ValueType;
 
+import java.util.ArrayList;
+
 public class Constant extends Value {
     private boolean isString;
 
@@ -40,6 +42,7 @@ public class Constant extends Value {
         Constant constant = new Constant(this.name);
         constant.setTp(this.tp.deepClone());
         constant.setString(this.isString);
+        constant.usersList = new ArrayList<>(usersList);
         return constant;
     }
 

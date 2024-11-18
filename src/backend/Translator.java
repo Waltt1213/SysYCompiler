@@ -123,8 +123,12 @@ public class Translator {
         // 记录参数映射
         allocArguments(function);
         // 记录save reg映射
-        for (int i = 0; i < 10; i++) {
-            stackManager.putVirtualReg("$t" + i, 4);
+        for (int i = 0; i < 18; i++) {
+            if (i < 10) {
+                stackManager.putVirtualReg("$t" + i, 4);
+            } else {
+                stackManager.putVirtualReg("$s" + (i - 10), 4);
+            }
             size += 4;
         }
         // 保存local var: MIPS在保存局部变量时，遵循的顺序是：先定义的变量后入栈
@@ -271,6 +275,7 @@ public class Translator {
         // 跳转到目标函数
         textSegment.add(new MipsInstruction(JAL, function.getName()));
         textSegment.add(new MipsInstruction(NOP));
+        // 回到调用者
         if (function.isNotVoid()) {
             MipsRegister ret = regManager.setTempRegUse(call.getFullName());
             textSegment.add(new MipsInstruction(MOVE, ret.getName(), "$v0"));
@@ -281,7 +286,6 @@ public class Translator {
             MipsRegister temp = regManager.getReg(entry.getKey());
             int ptr = stackManager.getVirtualPtr(temp.getName());
             textSegment.add(new MipsInstruction(LW,temp.getName(), "$sp", String.valueOf(ptr)));
-            regManager.getTempUseMap().put(entry.getKey(), entry.getValue());
         }
     }
 
@@ -303,7 +307,7 @@ public class Translator {
         } else {
             MipsRegister temp0;
             if (stackManager.isGlobalData(addr.getFullName())) {    // 全局变量
-                temp0 = regManager.getTempReg(addr.getFullName()); // 加载全局变量地址
+                temp0 = regManager.setTempRegUse(addr.getFullName()); // 加载全局变量地址
                 textSegment.add(new MipsInstruction(LA, temp0.getName(), addr.getName()));
                 textSegment.add(new MipsInstruction(SW, reg.getName(), temp0.getName(), "0"));
             } else {
@@ -326,7 +330,7 @@ public class Translator {
             textSegment.add(new MipsInstruction(LW, temp.getName(), "$sp", String.valueOf(ptr)));
         } else {
             if (stackManager.isGlobalData(addr.getFullName())) {    // 全局变量
-                MipsRegister temp0 = regManager.getTempReg(addr.getFullName()); // 加载全局变量地址
+                MipsRegister temp0 = regManager.setTempRegUse(addr.getFullName()); // 加载全局变量地址
                 textSegment.add(new MipsInstruction(LA, temp0.getName(), addr.getName()));
                 MipsRegister temp = regManager.setTempRegUse(load.getFullName()); // load到临时寄存器
                 textSegment.add(new MipsInstruction(LW, temp.getName(), temp0.getName(), "0"));
@@ -354,7 +358,7 @@ public class Translator {
             ptr += firstPtr;
         } else {
             if (stackManager.isGlobalData(firstAddr.getFullName())) {
-                first = regManager.getTempReg(firstAddr.getFullName()); // 加载全局变量地址
+                first = regManager.setTempRegUse(firstAddr.getFullName()); // 加载全局变量地址
                 textSegment.add(new MipsInstruction(LA, first.getName(), firstAddr.getName())); // 首地址为全局变量地址
             } else {
                 first = regManager.getReg(firstAddr.getFullName());
@@ -364,7 +368,7 @@ public class Translator {
             ptr += Integer.parseInt(bis1.getName()) * 4; // 指针初始化
         } else {
             MipsRegister temp = regManager.getReg(bis1.getFullName());
-            MipsRegister temp1 = regManager.getTempReg("*4");
+            MipsRegister temp1 = regManager.setTempRegUse("*4");
             textSegment.add(new MipsInstruction(SLL, temp1.getName(), temp.getName(), String.valueOf(2)));
             textSegment.add(new MipsInstruction(ADDU, first.getName(), first.getName(), temp1.getName()));
             regManager.resetTempReg(temp1);
@@ -378,7 +382,7 @@ public class Translator {
             } else {
                 MipsRegister temp = regManager.getReg(bis2.getFullName());
                 // 先乘4
-                MipsRegister temp1 = regManager.getTempReg("*41");
+                MipsRegister temp1 = regManager.setTempRegUse("*41");
                 textSegment.add(new MipsInstruction(SLL, temp1.getName(), temp.getName(), String.valueOf(2)));
                 MipsRegister bis = regManager.setTempRegUse(getElementPtr.getFullName());
                 textSegment.add(new MipsInstruction(ADDIU, bis.getName(), temp1.getName(), String.valueOf(ptr)));

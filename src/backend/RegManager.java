@@ -24,14 +24,14 @@ public class RegManager {
      * @param name 虚拟寄存器名
      */
     public MipsRegister setTempRegUse(String name) {
-        for (int i = 8; i < 18; i++) {
+        for (int i = 8; i < 26; i++) {
             if (tempUseMap.get(i).isEmpty()) {
                 tempUseMap.put(i, name);
                 return regPool.get(i);
             }
         }
         // 没有空的临时寄存器
-        return null;
+        return regPool.get(0);
     }
 
     /**
@@ -40,7 +40,7 @@ public class RegManager {
      */
     public MipsRegister getTempReg(String virtualName) {
         // t0 -> t7, t8, t9
-        for (int i = 8; i < 18; i++) {
+        for (int i = 8; i < 26; i++) {
             if (tempUseMap.get(i).equals(virtualName)) {
                 return regPool.get(i);
             }
@@ -109,7 +109,7 @@ public class RegManager {
         if (reg == null) {
             return;
         }
-        if (reg.getNo() < 8 || reg.getNo() > 17) {
+        if (reg.getNo() < 8 || reg.getNo() > 25) {
             return;
         }
         tempUseMap.put(reg.getNo(), "");

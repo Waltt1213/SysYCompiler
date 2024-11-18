@@ -69,9 +69,27 @@ public class BasicBlock extends Value {
         }
     }
 
+    public void insertInstr(Instruction instr, Instruction value, boolean setName) {
+        if (!isTerminator) {
+            if (setName) {
+                instr.setName(SlotTracker.slot());
+            }
+            int index = instructions.indexOf(value);
+            instructions.add(index + 1, instr);
+        }
+    }
+
     public void setTerminator(Instruction branch) {
         appendInstr(branch, false);
         isTerminator = true;
+    }
+
+    public void setTerminator(boolean terminator) {
+        isTerminator = terminator;
+    }
+
+    public boolean isTerminator() {
+        return isTerminator;
     }
 
     public LinkedList<Instruction> getInstructions() {

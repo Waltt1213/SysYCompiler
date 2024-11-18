@@ -193,12 +193,12 @@ public class Visitor {
             curBasicBlock.appendInstr(alloca, true);
             // 再store初值
             ArrayList<Value> constants = visitConstInitVal(constDef.getConstInitVal(), type.getDataType());
-            buildLocalInit(alloca, constants, true);
+            buildLocalInit(alloca, constants, true, null);
             var.setValue(alloca);
         }
     }
 
-    public void buildLocalInit(Alloca alloca, ArrayList<Value> inits, boolean isConst) { // TODO: 有大问题
+    public void buildLocalInit(Alloca alloca, ArrayList<Value> inits, boolean isConst, InitVal initVal) { // TODO: 有大问题
         if (inits.size() == 1) { // 单个常量 or 字符串
             Value value = inits.get(0);
             if (value instanceof Constant && ((Constant) value).isString()) {
@@ -239,13 +239,35 @@ public class Visitor {
                 getElementPtr.addOperands(new Constant("0"));
                 getElementPtr.addOperands(new Constant("0"));
                 curBasicBlock.appendInstr(getElementPtr, true);
-                Value res = buildInit(getElementPtr, inits.get(0));
+                Value res;
+                if (initVal != null) {
+                    Value init;
+                    if (initVal.isExp()) {
+                        init = visitAddExp(initVal.getExp().getAddExp());
+                    } else {
+                        init = visitAddExp(initVal.getExps().get(0).getAddExp());
+                    }
+                    res = buildInit(getElementPtr, init);
+                } else {
+                    res = buildInit(getElementPtr, inits.get(0));
+                }
                 if (isConst) {
                     alloca.setConst(true);
                     alloca.addConstInit(res);
                 }
             } else {
-                Value res = buildInit(alloca, inits.get(0));
+                Value res;
+                if (initVal != null) {
+                    Value init;
+                    if (initVal.isExp()) {
+                        init = visitAddExp(initVal.getExp().getAddExp());
+                    } else {
+                        init = visitAddExp(initVal.getExps().get(0).getAddExp());
+                    }
+                    res = buildInit(alloca, init);
+                } else {
+                    res = buildInit(alloca, inits.get(0));
+                }
                 if (isConst) {
                     alloca.setConst(true);
                     alloca.addConstInit(res);
@@ -264,8 +286,15 @@ public class Visitor {
                 }
                 Value res = null;
                 if (i < inits.size()) {
-                    curBasicBlock.appendInstr(getElementPtr, true);
-                    res = buildInit(getElementPtr, inits.get(i));
+                    // init.get(i) = visitAddExp(initVal.getExps().get(i).getAddExp())
+                    if (initVal == null) {
+                        curBasicBlock.appendInstr(getElementPtr, true);
+                        res = buildInit(getElementPtr, inits.get(i));
+                    } else {
+                        Value init = visitAddExp(initVal.getExps().get(i).getAddExp());
+                        curBasicBlock.appendInstr(getElementPtr, true);
+                        res = buildInit(getElementPtr, init);
+                    }
                 } else if (isConst) {
                     curBasicBlock.appendInstr(getElementPtr, true);
                     res = buildInit(getElementPtr, new Constant(new ValueType.Type(alloca.getDataType()), "0"));
@@ -355,8 +384,11 @@ public class Visitor {
             curBasicBlock.appendInstr(alloca, true);
             // 再store初值
             if (varDef.hasInitVal()) {
+                boolean oldTer = curBasicBlock.isTerminator();
+                curBasicBlock.setTerminator(true);
                 ArrayList<Value> inits = visitInitVal(varDef.getInitVal());
-                buildLocalInit(alloca, inits, false);
+                curBasicBlock.setTerminator(oldTer);
+                buildLocalInit(alloca, inits, false, varDef.getInitVal());
             }
             var.setValue(alloca);
         }
