@@ -2,9 +2,11 @@ package llvmir.values.instr;
 
 import llvmir.User;
 import llvmir.ValueType;
+import middle.SlotTracker;
 
 public class Instruction extends User {
     private final Type irType;
+    private boolean needName = false;
 
     public Instruction(ValueType.Type vt, Type irType, String name) {
         super(vt, name);
@@ -70,5 +72,19 @@ public class Instruction extends User {
 
     public Type getIrType() {
         return irType;
+    }
+
+    public void setNeedName(boolean needName) {
+        this.needName = needName;
+    }
+
+    public boolean isNeedName() {
+        return needName;
+    }
+
+    public void setVirtualName() {
+        if (needName) {
+            setName(SlotTracker.slot());
+        }
     }
 }

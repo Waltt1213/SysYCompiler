@@ -21,6 +21,10 @@ public class Value {
         usersList.add(user);
     }
 
+    public void removeUser(User user) {
+        usersList.remove(user);
+    }
+
     public ArrayList<User> getUsersList() {
         return usersList;
     }

@@ -1,6 +1,8 @@
 package llvmir.values.instr;
 
 import llvmir.ValueType;
+import llvmir.values.BasicBlock;
+import middle.SlotTracker;
 
 public class Branch extends Instruction {
 

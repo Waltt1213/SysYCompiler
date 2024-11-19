@@ -3,6 +3,7 @@ package llvmir.values;
 import llvmir.Value;
 import llvmir.ValueType;
 import llvmir.values.instr.Return;
+import middle.SlotTracker;
 
 import java.util.ArrayList;
 
@@ -28,8 +29,9 @@ public class Function extends Value {
         return funcFParams.size();
     }
 
-    public void addParams(Argument value) {
+    public void addParams(Argument value, boolean needName) {
         funcFParams.add(value);
+        value.setNeedName(needName);
     }
 
     public void addBasicBlock(BasicBlock basicBlock) {
@@ -39,6 +41,7 @@ public class Function extends Value {
             last.setDirect(basicBlock);
         }
         basicBlocks.add(basicBlock);
+        basicBlock.setNeedName(true);
     }
 
     public void setNotVoid(boolean isReturn) {
@@ -70,6 +73,21 @@ public class Function extends Value {
         isReturn = true;
         Return ret = new Return(null, value);
         basicBlock.setTerminator(ret);
+    }
+
+    public void setVirtualName() {
+        for (Argument argument: funcFParams) {
+            if (argument.isNeedName()) {
+                argument.setName(SlotTracker.slot());
+            }
+        }
+        boolean isFirst = true;
+        for (BasicBlock basicBlock: basicBlocks) {
+            basicBlock.setName(SlotTracker.slot());
+            basicBlock.setNeedName(false);
+            basicBlock.setVirtualName();
+            isFirst = false;
+        }
     }
 
     @Override

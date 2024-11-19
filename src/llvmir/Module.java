@@ -2,6 +2,7 @@ package llvmir;
 
 import llvmir.values.Function;
 import llvmir.values.GlobalVariable;
+import middle.SlotTracker;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -48,6 +49,13 @@ public class Module extends Value {
 
     public HashMap<String, Function> getDeclares() {
         return declares;
+    }
+
+    public void setVirtualName() {
+        for (Function function: functions) {
+            SlotTracker.reset();
+            function.setVirtualName();
+        }
     }
 
     @Override

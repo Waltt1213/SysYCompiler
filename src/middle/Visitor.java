@@ -44,6 +44,7 @@ public class Visitor {
         curFunction = null;
         curBasicBlock = null;
         visitCompUnit(root);
+        module.setVirtualName();
     }
 
     public ArrayList<SymbolTable> getSymbolTables() {
@@ -73,7 +74,7 @@ public class Visitor {
     }
 
     public void visitFuncDef(FuncDef fd) {
-        SlotTracker.reset();
+        // SlotTracker.reset();
         String funcType = getType(fd.getFuncType().getType());
         SymType ft = new SymType(funcType, false, false, true);
         String funcName = fd.getIdent().getContent();
@@ -105,7 +106,7 @@ public class Visitor {
                 paramsSym = visitFuncFParams(fd.getFuncFParams());  // 函数形参与函数块内符号属于同一层级
             } catch (Error e) { errors.add(e); }
         }
-        curBasicBlock.setName(SlotTracker.slot()); // 基本块占一个%
+        // curBasicBlock.setName(SlotTracker.slot()); // 基本块占一个%
         buildParamInit(paramsSym);
         visitBlock(fd.getBlock());  // 构建函数内符号表
         if (!ft.toString().equals("VoidFunc") && !fd.getBlock().hasRet()) {
@@ -132,7 +133,7 @@ public class Visitor {
 
     public void visitMainFuncDef(MainFuncDef astNode) {
         // 归零
-        SlotTracker.reset();
+        // SlotTracker.reset();
         // 创建main函数
         Function main = new Function(new ValueType.Type(Integer32Ty), "main", true);
         curFunction = main;
@@ -150,7 +151,6 @@ public class Visitor {
         curTable.addChildren(st);   // 新表设为当前表的孩子
         curTable = st;
         symbolTables.add(curTable); // 将符号表加入符号表集
-        curBasicBlock.setName(SlotTracker.slot()); // 基本块占一个%
         visitBlock(astNode.getBlock());
     }
 
@@ -426,8 +426,8 @@ public class Visitor {
                 funcVarType += "Pointer";
             }
             // 创建参数并加入函数
-            Argument argument = new Argument(getDataType(funcVarType), SlotTracker.slot());
-            curFunction.addParams(argument);
+            Argument argument = new Argument(getDataType(funcVarType), "");
+            curFunction.addParams(argument, true);
             SymType st = new SymType(getType(fp.getType()), fp.isArray(), false, false);
             Symbol symbol = new Symbol(funcVarName, st, curDepth, fp.getIdent().getLineno());
             curTable.addSymItem(funcVarName, symbol);
@@ -566,7 +566,7 @@ public class Visitor {
         }
         // 进入条件判断
         visitCond((Cond) stmt.getStmts().get(0), ifBlock, endBlock, elseBlock);
-        ifBlock.setName(SlotTracker.slot());
+        // ifBlock.setName(SlotTracker.slot());
         curFunction.addBasicBlock(ifBlock);
         // 进入ifBlock
         curBasicBlock = ifBlock;
@@ -577,7 +577,7 @@ public class Visitor {
         endBlock.setLabeled(true);
         // 进入else
         if (stmt.getStmts().size() > 2 && elseBlock != null) {
-            elseBlock.setName(SlotTracker.slot());
+            // elseBlock.setName(SlotTracker.slot());
             curFunction.addBasicBlock(elseBlock);
             curBasicBlock = elseBlock;
             visitStmt((Stmt) stmt.getStmts().get(2));
@@ -586,7 +586,7 @@ public class Visitor {
             curBasicBlock.setTerminator(out2);
             endBlock.setLabeled(true);
         }
-        endBlock.setName(SlotTracker.slot());
+        // endBlock.setName(SlotTracker.slot());
         curBasicBlock = endBlock;
         curFunction.addBasicBlock(endBlock);
     }
@@ -619,7 +619,7 @@ public class Visitor {
             judge.addOperands(judgeBlock);
             curBasicBlock = judgeBlock;
             curFunction.addBasicBlock(judgeBlock);
-            judgeBlock.setName(SlotTracker.slot());
+            // judgeBlock.setName(SlotTracker.slot());
             visitCond((Cond) stmt.getStmts().get(1), condBlock, outBlock, null);
             if (updateBlock == null) {
                 condBlock.setUpdateBlock(judgeBlock);
@@ -628,7 +628,7 @@ public class Visitor {
             judge.addOperands(condBlock);
         }
         // 进入条件执行体
-        condBlock.setName(SlotTracker.slot());
+        // condBlock.setName(SlotTracker.slot());
         curBasicBlock = condBlock;
         curFunction.addBasicBlock(condBlock);
         loopBlockStack.push(condBlock);
@@ -636,7 +636,7 @@ public class Visitor {
         // 跳转到continueBlock
         if (updateBlock != null) {
             updateBlock.setLabeled(true);
-            updateBlock.setName(SlotTracker.slot());
+            // updateBlock.setName(SlotTracker.slot());
             Branch join = new Branch("");
             join.addOperands(updateBlock);
             curBasicBlock.setTerminator(join);
@@ -655,7 +655,7 @@ public class Visitor {
         }
         curBasicBlock.setTerminator(next);
         // 进入结束块
-        outBlock.setName(SlotTracker.slot());
+        // outBlock.setName(SlotTracker.slot());
         curBasicBlock = outBlock;
         curFunction.addBasicBlock(outBlock);
         loopBlockStack.pop();
@@ -751,7 +751,7 @@ public class Visitor {
             if (putstr == null) {
                 putstr = new Function(new ValueType.Type(VoidTy),"putstr", false);
                 module.addDeclare(putstr);
-                putstr.addParams(new Argument(new ValueType.PointerType(Integer8Ty), "param"));
+                putstr.addParams(new Argument(new ValueType.PointerType(Integer8Ty), "param"), false);
             }
             Call call = new Call(putstr);
             curBasicBlock.appendInstr(call, false);
@@ -765,7 +765,7 @@ public class Visitor {
             if (putch == null) {
                 putch = new Function(new ValueType.Type(VoidTy), "putch", false);
                 module.addDeclare(putch);
-                putch.addParams(new Argument(new ValueType.Type(Integer32Ty), "param"));
+                putch.addParams(new Argument(new ValueType.Type(Integer32Ty), "param"), false);
             }
             Call call = new Call(putch);
             Value newVar = zext(var);
@@ -776,7 +776,7 @@ public class Visitor {
             if (putint == null) {
                 putint = new Function(new ValueType.Type(VoidTy), "putint", false);
                 module.addDeclare(putint);
-                putint.addParams(new Argument(new ValueType.Type(Integer32Ty), "param"));
+                putint.addParams(new Argument(new ValueType.Type(Integer32Ty), "param"), false);
             }
             Call call = new Call(putint);
             Value newVar = zext(var);
@@ -833,7 +833,7 @@ public class Visitor {
                     falseBlock = blocks.get(2); // false则跳转至elseBlock
                 }
             } else if (next != null) { // 后面还有或语句
-                next.setName(SlotTracker.slot());
+                // next.setName(SlotTracker.slot());
                 falseBlock = next;
                 curFunction.addBasicBlock(next);
             }
@@ -874,7 +874,7 @@ public class Visitor {
             if (i == lAndExp.getEqExps().size() - 1) {
                 tureBlock = blocks.get(0);
             } else {
-                BasicBlock judge = new BasicBlock(SlotTracker.slot(), curFunction); // 新的基本块做下一个与判断
+                BasicBlock judge = new BasicBlock("", curFunction); // 新的基本块做下一个与判断
                 tureBlock = judge;
                 curFunction.addBasicBlock(judge);
             }

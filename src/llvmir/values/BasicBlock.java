@@ -2,6 +2,7 @@ package llvmir.values;
 
 import llvmir.Value;
 import llvmir.ValueType;
+import llvmir.values.instr.Branch;
 import llvmir.values.instr.Instruction;
 import middle.SlotTracker;
 
@@ -11,7 +12,8 @@ import java.util.LinkedList;
 public class BasicBlock extends Value {
     private final LinkedList<Instruction> instructions;
     private final Function parent;
-    private boolean isLabeled;
+    private boolean needName = false;   // 需要SlotTracker提供一个名字
+    private boolean isLabeled;  // 需要打印出名字
     private boolean isTerminator;
     private ArrayList<BasicBlock> subsequents = new ArrayList<>();
     private ArrayList<BasicBlock> precursor = new ArrayList<>();
@@ -21,6 +23,14 @@ public class BasicBlock extends Value {
         super(new ValueType.Type(ValueType.DataType.LabelTy), name);
         instructions = new LinkedList<>();
         parent = function;
+    }
+
+    public void setNeedName(boolean needName) {
+        this.needName = needName;
+    }
+
+    public boolean isNeedName() {
+        return needName;
     }
 
     public void setLabeled(boolean labeled) {
@@ -62,10 +72,16 @@ public class BasicBlock extends Value {
 
     public void appendInstr(Instruction instr, boolean setName) {
         if (!isTerminator) {
-            if (setName) {
-                instr.setName(SlotTracker.slot());
-            }
+            // if (setName) {
+                // instr.setName(SlotTracker.slot());
+
+        // }
+            instr.setNeedName(setName);
             instructions.add(instr);
+            return;
+        }
+        for (Value operand: instr.getOperands()) {
+            operand.removeUser(instr);
         }
     }
 
@@ -90,6 +106,12 @@ public class BasicBlock extends Value {
 
     public boolean isTerminator() {
         return isTerminator;
+    }
+
+    public void setVirtualName() {
+        for (Instruction instruction: instructions) {
+            instruction.setVirtualName();
+        }
     }
 
     public LinkedList<Instruction> getInstructions() {
