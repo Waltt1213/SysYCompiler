@@ -1,6 +1,7 @@
 import backend.Translator;
 import frontend.Lexer;
 import frontend.Parser;
+import llvmir.Module;
 import middle.Visitor;
 import utils.FileIO;
 
@@ -30,10 +31,12 @@ public class Compiler {
         FileIO.printError(visitor.getErrors());
 
         // Step 5: print the LLVM IR
-        FileIO.printLlvmIrResult(visitor.getModule());
+        Module module = visitor.getModule();
+        module.setVirtualName();
+        FileIO.printLlvmIrResult(module);
 
         // Step6: generate Mips code and print the result
-        Translator translator = new Translator(visitor.getModule());
+        Translator translator = new Translator(module);
         translator.genMipsCode();
         FileIO.printMipsCode(translator.getDataSegment(), translator.getTextSegment());
     }

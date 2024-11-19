@@ -44,7 +44,6 @@ public class Visitor {
         curFunction = null;
         curBasicBlock = null;
         visitCompUnit(root);
-        module.setVirtualName();
     }
 
     public ArrayList<SymbolTable> getSymbolTables() {

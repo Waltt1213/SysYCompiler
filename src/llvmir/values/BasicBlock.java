@@ -2,7 +2,6 @@ package llvmir.values;
 
 import llvmir.Value;
 import llvmir.ValueType;
-import llvmir.values.instr.Branch;
 import llvmir.values.instr.Instruction;
 import middle.SlotTracker;
 
@@ -72,10 +71,6 @@ public class BasicBlock extends Value {
 
     public void appendInstr(Instruction instr, boolean setName) {
         if (!isTerminator) {
-            // if (setName) {
-                // instr.setName(SlotTracker.slot());
-
-        // }
             instr.setNeedName(setName);
             instructions.add(instr);
             return;

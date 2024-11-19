@@ -81,12 +81,10 @@ public class Function extends Value {
                 argument.setName(SlotTracker.slot());
             }
         }
-        boolean isFirst = true;
         for (BasicBlock basicBlock: basicBlocks) {
             basicBlock.setName(SlotTracker.slot());
             basicBlock.setNeedName(false);
             basicBlock.setVirtualName();
-            isFirst = false;
         }
     }
 
