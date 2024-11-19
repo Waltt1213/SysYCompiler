@@ -44,6 +44,20 @@ public class Function extends Value {
         basicBlock.setNeedName(true);
     }
 
+    public void removeBasicBlock(BasicBlock basicBlock) {
+        if (basicBlocks.contains(basicBlock)) {
+            // 删除后继联系
+            for (BasicBlock next: basicBlock.getSubsequents()) {
+                next.removePreBlock(basicBlock);
+            }
+            // 删除前驱联系
+            for (BasicBlock pre: basicBlock.getPrecursor()) {
+                pre.removeSubBlock(basicBlock);
+            }
+            basicBlocks.remove(basicBlock);
+        }
+    }
+
     public void setNotVoid(boolean isReturn) {
         this.isNotVoid = isReturn;
     }

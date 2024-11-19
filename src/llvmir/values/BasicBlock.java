@@ -63,6 +63,14 @@ public class BasicBlock extends Value {
         subsequents.add(basicBlock);
     }
 
+    public void removeSubBlock(BasicBlock basicBlock) {
+        subsequents.remove(basicBlock);
+    }
+
+    public void removePreBlock(BasicBlock basicBlock) {
+        precursor.remove(basicBlock);
+    }
+
     public void setDirect(BasicBlock basicBlock) {
         direct = basicBlock;
     }
@@ -138,6 +146,14 @@ public class BasicBlock extends Value {
 
     public LinkedList<Instruction> getInstructions() {
         return instructions;
+    }
+
+    public HashSet<BasicBlock> getSubsequents() {
+        return subsequents;
+    }
+
+    public HashSet<BasicBlock> getPrecursor() {
+        return precursor;
     }
 
     @Override
