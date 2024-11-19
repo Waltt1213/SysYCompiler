@@ -613,9 +613,9 @@ public class Visitor {
         // 进入条件判断
         BasicBlock judgeBlock = new BasicBlock("", curFunction);
         Branch judge = new Branch("");
-        curBasicBlock.setTerminator(judge);
         if (stmt.getStmts().get(1) != null) {
             judge.addOperands(judgeBlock);
+            curBasicBlock.setTerminator(judge);
             curBasicBlock = judgeBlock;
             curFunction.addBasicBlock(judgeBlock);
             // judgeBlock.setName(SlotTracker.slot());
@@ -625,6 +625,7 @@ public class Visitor {
             }
         } else {
             judge.addOperands(condBlock);
+            curBasicBlock.setTerminator(judge);
         }
         // 进入条件执行体
         // condBlock.setName(SlotTracker.slot());

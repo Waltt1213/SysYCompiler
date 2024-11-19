@@ -3,6 +3,7 @@ import frontend.Lexer;
 import frontend.Parser;
 import llvmir.Module;
 import middle.Visitor;
+import middle.optimizer.MidOptimizer;
 import utils.FileIO;
 
 import java.io.IOException;
@@ -30,12 +31,16 @@ public class Compiler {
         FileIO.printSymTableResult(visitor.getSymbolTables());
         FileIO.printError(visitor.getErrors());
 
-        // Step 5: print the LLVM IR
-        Module module = visitor.getModule();
+        // Step 5: Mid optimize
+        MidOptimizer optimizer = new MidOptimizer(visitor.getModule());
+        optimizer.optimize();
+
+        // Step 6: print the LLVM IR
+        Module module = optimizer.getModule();
         module.setVirtualName();
         FileIO.printLlvmIrResult(module);
 
-        // Step6: generate Mips code and print the result
+        // Step 7: generate Mips code and print the result
         Translator translator = new Translator(module);
         translator.genMipsCode();
         FileIO.printMipsCode(translator.getDataSegment(), translator.getTextSegment());

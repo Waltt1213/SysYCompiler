@@ -37,7 +37,7 @@ public class Function extends Value {
     public void addBasicBlock(BasicBlock basicBlock) {
         if (!basicBlocks.isEmpty()) {
             BasicBlock last = basicBlocks.get(basicBlocks.size() - 1);
-            basicBlock.addPreBlock(last);
+            // basicBlock.addPreBlock(last);
             last.setDirect(basicBlock);
         }
         basicBlocks.add(basicBlock);

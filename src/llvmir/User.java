@@ -23,6 +23,13 @@ public class User extends Value {
         }
     }
 
+    public void removeOperands(Value value) {
+        operands.remove(value);
+        if (value != null) {
+            value.removeUser(this);
+        }
+    }
+
     @Override
     public String toString() {
         return super.toString();
