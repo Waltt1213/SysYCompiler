@@ -18,12 +18,14 @@ public class BasicBlock extends Value {
     private boolean isTerminator;
     private final HashSet<BasicBlock> subsequents = new HashSet<>();
     private final HashSet<BasicBlock> precursor = new HashSet<>();
+    private HashSet<BasicBlock> dom = new HashSet<>();
     private BasicBlock direct;
 
     public BasicBlock(String name, Function function) {
         super(new ValueType.Type(ValueType.DataType.LabelTy), name);
         instructions = new LinkedList<>();
         parent = function;
+        dom.add(this);
     }
 
     public void setNeedName(boolean needName) {
@@ -69,6 +71,14 @@ public class BasicBlock extends Value {
 
     public void removePreBlock(BasicBlock basicBlock) {
         precursor.remove(basicBlock);
+    }
+
+    public void setDom(HashSet<BasicBlock> dom) {
+        this.dom = dom;
+    }
+
+    public HashSet<BasicBlock> getDom() {
+        return dom;
     }
 
     public void setDirect(BasicBlock basicBlock) {

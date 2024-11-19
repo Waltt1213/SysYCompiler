@@ -17,12 +17,14 @@ public class MidOptimizer {
     }
 
     public void optimize() {
+        module.setVirtualName();
         removeDeadBlocks();
+        buildDom();
     }
 
     // 优化1：删除死代码块
     private void removeDeadBlocks() {
-        for (Function function: functions) {
+        for (Function function : functions) {
             dfsUnableReachBlock(function);
         }
     }
@@ -38,6 +40,49 @@ public class MidOptimizer {
         for (BasicBlock removed: removedBlocks) {
             function.removeBasicBlock(removed);
         }
+    }
+
+    private void buildDom() {
+        for (Function function: functions) {
+            buildFuncDom(function);
+        }
+    }
+
+    private void buildFuncDom(Function function) {
+        boolean changed;
+        BasicBlock first = function.getBasicBlocks().get(0);
+        for (BasicBlock block: function.getBasicBlocks()) {
+            if (block.equals(first)) {
+                continue;
+            }
+            HashSet<BasicBlock> initDom = new HashSet<>(function.getBasicBlocks());
+            block.setDom(initDom);
+        }
+        do {
+            changed = false;
+            for (BasicBlock block: function.getBasicBlocks()) {
+                if (block.equals(first)) {
+                    continue;
+                }
+                HashSet<BasicBlock> dom = new HashSet<>(function.getBasicBlocks());
+                for (BasicBlock pre: block.getPrecursor()) {
+                    dom.retainAll(pre.getDom());
+                }
+                dom.add(block);
+                if (!dom.equals(block.getDom())) {
+                    changed = true;
+                    block.setDom(dom);
+                }
+            }
+        } while (changed);
+        System.out.println(function.getName() + ":");
+        for (BasicBlock basicBlock: function.getBasicBlocks()) {
+            System.out.println("block_" + basicBlock.getName() + ": ");
+            for (BasicBlock block: basicBlock.getDom()) {
+                System.out.println(block.getName());
+            }
+        }
+        System.out.println("\n");
     }
 
     private void dfs(BasicBlock start,
