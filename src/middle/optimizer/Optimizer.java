@@ -7,11 +7,11 @@ import llvmir.values.Function;
 import java.util.ArrayList;
 import java.util.HashSet;
 
-public class MidOptimizer {
+public class Optimizer {
     private Module module;
     private ArrayList<Function> functions;
 
-    public MidOptimizer(Module module) {
+    public Optimizer(Module module) {
         this.module = module;
         functions = module.getFunctions();
     }

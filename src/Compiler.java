@@ -1,9 +1,9 @@
-import backend.Translator;
+import backend.OldTranslator;
 import frontend.Lexer;
 import frontend.Parser;
 import llvmir.Module;
 import middle.Visitor;
-import middle.optimizer.MidOptimizer;
+import middle.optimizer.Optimizer;
 import utils.FileIO;
 
 import java.io.IOException;
@@ -32,7 +32,7 @@ public class Compiler {
         FileIO.printError(visitor.getErrors());
 
         // Step 5: Mid optimize
-        MidOptimizer optimizer = new MidOptimizer(visitor.getModule());
+        Optimizer optimizer = new Optimizer(visitor.getModule());
         optimizer.optimize();
 
         // Step 6: print the LLVM IR
@@ -41,8 +41,8 @@ public class Compiler {
         FileIO.printLlvmIrResult(module);
 
         // Step 7: generate Mips code and print the result
-        Translator translator = new Translator(module);
-        translator.genMipsCode();
-        FileIO.printMipsCode(translator.getDataSegment(), translator.getTextSegment());
+        OldTranslator oldTranslator = new OldTranslator(module);
+        oldTranslator.genMipsCode();
+        FileIO.printMipsCode(oldTranslator.getDataSegment(), oldTranslator.getTextSegment());
     }
 }

@@ -7,6 +7,13 @@ public class VirtualRegister {
     private int start;
     private int end;
 
+    private boolean isConst = false;
+
+    public static VirtualRegister vSp = new VirtualRegister("$sp");
+    public static VirtualRegister vfp = new VirtualRegister("$fp");
+    public static VirtualRegister vra = new VirtualRegister("$ra");
+    public static VirtualRegister vZero = new VirtualRegister("$zero");
+
     public VirtualRegister(String name) {
         this.name = name;
     }
@@ -25,6 +32,18 @@ public class VirtualRegister {
 
     public int getEnd() {
         return end;
+    }
+
+    public void setConst(boolean aConst) {
+        isConst = aConst;
+    }
+
+    public boolean isConst() {
+        return isConst;
+    }
+
+    public String getName() {
+        return name;
     }
 
     @Override

@@ -1,11 +1,11 @@
 package backend.mips;
 
-public class MipsDataSeg {
+public class MipsData {
     private String name;
     private String type;
     private String init;
 
-    public MipsDataSeg(String name, String type, String init) {
+    public MipsData(String name, String type, String init) {
         this.name = name;
         this.type = type;
         this.init = init;

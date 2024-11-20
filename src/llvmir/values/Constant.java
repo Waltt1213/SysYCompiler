@@ -10,6 +10,7 @@ public class Constant extends Value {
 
     public Constant(String name) {
         super(new ValueType.Type(ValueType.DataType.Integer32Ty), name);
+        id = constId;
     }
 
     public Constant(ValueType.Type type, String name) {

@@ -1,6 +1,6 @@
 package utils;
 
-import backend.mips.MipsDataSeg;
+import backend.mips.MipsData;
 import backend.mips.MipsInstruction;
 import frontend.Error;
 import frontend.Token;
@@ -96,14 +96,14 @@ public class FileIO {
         fw.close();
     }
 
-    public static void printMipsCode(ArrayList<MipsDataSeg> dataSegment,
+    public static void printMipsCode(ArrayList<MipsData> dataSegment,
                                      ArrayList<MipsInstruction> textSegment) throws IOException {
         FileWriter fw = new FileWriter(mipsFilePath);
         BufferedWriter bw = new BufferedWriter(fw);
         if (!dataSegment.isEmpty()) {
             bw.write(".data\n");
         }
-        for (MipsDataSeg dataSeg: dataSegment) {
+        for (MipsData dataSeg: dataSegment) {
             bw.write(dataSeg.toString() + "\n");
         }
         if (!textSegment.isEmpty()) {

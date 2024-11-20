@@ -1,6 +1,7 @@
 package llvmir;
 
 import java.util.ArrayList;
+import java.util.Objects;
 
 // 一个继承自Value的类意味着，它定义了一个结果，可被其它IR使用。
 public class Value {
@@ -9,6 +10,7 @@ public class Value {
     protected String id = localId;
     public static String globalId = "@";
     public static String localId = "%";
+    public static String constId = "#";
     protected ArrayList<User> usersList; // 使用这个value的user
 
     public Value(ValueType.Type vt, String name) {
@@ -49,8 +51,17 @@ public class Value {
         return id + name;
     }
 
+    public String getId() {
+        return id;
+    }
+
     public String getDef() {
         return getTp().toString() + " " + getFullName();
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, tp, id);
     }
 
     @Override

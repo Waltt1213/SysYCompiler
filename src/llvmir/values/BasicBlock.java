@@ -6,7 +6,6 @@ import llvmir.values.instr.Branch;
 import llvmir.values.instr.Instruction;
 import middle.SlotTracker;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
 
@@ -19,6 +18,8 @@ public class BasicBlock extends Value {
     private final HashSet<BasicBlock> subsequents = new HashSet<>();
     private final HashSet<BasicBlock> precursor = new HashSet<>();
     private HashSet<BasicBlock> dom = new HashSet<>();
+    private HashSet<Value> uses = new HashSet<>();
+    private HashSet<Value> defs = new HashSet<>();
     private BasicBlock direct;
 
     public BasicBlock(String name, Function function) {
@@ -93,6 +94,7 @@ public class BasicBlock extends Value {
         if (!isTerminator) {
             instr.setNeedName(setName);
             instructions.add(instr);
+            instr.setParent(this);
             if (instr instanceof Branch) {
                 Branch branch = (Branch) instr;
                 if (branch.getOperands().size() == 1) {
@@ -164,6 +166,22 @@ public class BasicBlock extends Value {
 
     public HashSet<BasicBlock> getPrecursor() {
         return precursor;
+    }
+
+    public void setDefs(HashSet<Value> def) {
+        this.defs = def;
+    }
+
+    public void setUses(HashSet<Value> use) {
+        this.uses = use;
+    }
+
+    public HashSet<Value> getUses() {
+        return uses;
+    }
+
+    public HashSet<Value> getDefs() {
+        return defs;
     }
 
     @Override

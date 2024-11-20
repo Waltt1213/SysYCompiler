@@ -2,10 +2,12 @@ package llvmir.values.instr;
 
 import llvmir.User;
 import llvmir.ValueType;
+import llvmir.values.BasicBlock;
 import middle.SlotTracker;
 
 public class Instruction extends User {
     private final Type irType;
+    private BasicBlock parent;
     private boolean needName = false;
 
     public Instruction(ValueType.Type vt, Type irType, String name) {
@@ -80,6 +82,14 @@ public class Instruction extends User {
 
     public boolean isNeedName() {
         return needName;
+    }
+
+    public void setParent(BasicBlock parent) {
+        this.parent = parent;
+    }
+
+    public BasicBlock getParent() {
+        return parent;
     }
 
     public void setVirtualName() {
