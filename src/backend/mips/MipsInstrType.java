@@ -24,7 +24,6 @@ public enum MipsInstrType {
     SLTI("slti"),
     SEQ("seq"),
     SNE("sne"),
-
     BEQ("beq"),
     BNE("bne"),
     BLT("blt"),

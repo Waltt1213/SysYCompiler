@@ -17,7 +17,6 @@ public class Optimizer {
     }
 
     public void optimize() {
-        module.setVirtualName();
         removeDeadBlocks();
         buildDom();
     }

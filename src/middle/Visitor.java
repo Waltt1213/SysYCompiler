@@ -699,10 +699,10 @@ public class Visitor {
             }
             return;
         }
-        ArrayList<Value> puts = new ArrayList<>();
-        for (AstNode exp: stmt.getStmts()) {
-            puts.add(visitAddExp(((Exp) exp).getAddExp()));
-        }
+//        ArrayList<Value> puts = new ArrayList<>();
+//        for (AstNode exp: stmt.getStmts()) {
+//            puts.add(visitAddExp(((Exp) exp).getAddExp()));
+//        }
         int index = 0;
         String strConst = stmt.getStringConst();
         StringBuilder sb = new StringBuilder();
@@ -724,7 +724,8 @@ public class Visitor {
                     buildPrintf(var, 's'); // 打印字符串
                 }
                 i++;
-                buildPrintf(puts.get(index), strConst.charAt(i));
+                Value exp = visitAddExp(((Exp) stmt.getStmts().get(index)).getAddExp());
+                buildPrintf(exp, strConst.charAt(i));
                 index++;
             } else {
                 sb.append(c);

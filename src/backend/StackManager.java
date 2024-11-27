@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 
 public class StackManager {
+    private static StackManager stackManager = new StackManager();
     private int stackPtr;   // 栈顶偏移指针
     private HashMap<String, Integer> stackFrameMap; // 栈帧
     private HashSet<String> globalDataSet = new HashSet<>();
@@ -15,9 +16,13 @@ public class StackManager {
      * save register <br>
      * arguments <br>
      */
-    public StackManager() {
+    private StackManager() {
         stackPtr = 0;
         stackFrameMap = new HashMap<>();
+    }
+
+    public static StackManager getInstance() {
+        return stackManager;
     }
 
     public void addGlobalData(String data) {
@@ -57,6 +62,21 @@ public class StackManager {
             return -1;
         }
         return stackFrameMap.get(name);
+    }
+
+    public boolean inStack(String name) {
+        return stackFrameMap.containsKey(name);
+    }
+
+    public void push(String name) {
+        for (String virtual: stackFrameMap.keySet()) {
+            if (stackFrameMap.get(virtual) >= 0) {
+                int ptr = stackFrameMap.get(virtual) + 4;
+                stackFrameMap.put(virtual, ptr);
+            }
+        }
+        stackFrameMap.put(name, 0);
+        stackPtr += 4;
     }
 
     public void clear() {

@@ -20,7 +20,7 @@ import static backend.mips.MipsInstrType.SW;
 public class Translator {
     private final Module module;
     private MipsModule mipsModule;
-    private StackManager stackManager = new StackManager();
+    private StackManager stackManager = StackManager.getInstance();
     private HashMap<Value, VirtualRegister> value2virtualMap = new HashMap<>();
     private MipsFunction currentFunction;
     private BasicBlock curBlock;
@@ -430,7 +430,7 @@ public class Translator {
         } else {
             VirtualRegister op1 = getVirtualReg(operand1);
             VirtualRegister op2 = getVirtualReg(operand2);
-            currentFunction.addInstr(new MipsInstruction(SUB, temp.getName(), op1.getName(), op2.getName()));
+            currentFunction.addInstr(new MipsInstruction(SUBU, temp.getName(), op1.getName(), op2.getName()));
         }
     }
 

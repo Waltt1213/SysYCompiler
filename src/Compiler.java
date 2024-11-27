@@ -9,6 +9,7 @@ import utils.FileIO;
 import java.io.IOException;
 
 public class Compiler {
+    private static final boolean Optimize = false;
 
     public static void main(String[] args) throws IOException {
         // Step 1: read source code from test file
@@ -33,7 +34,9 @@ public class Compiler {
 
         // Step 5: Mid optimize
         Optimizer optimizer = new Optimizer(visitor.getModule());
-        optimizer.optimize();
+        if (Optimize) {
+            optimizer.optimize();
+        }
 
         // Step 6: print the LLVM IR
         Module module = optimizer.getModule();

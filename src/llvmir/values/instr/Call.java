@@ -13,12 +13,14 @@ public class Call extends Instruction {
     public Call(String name, Function callFunc) {
         super(callFunc.getTp(), Type.CALL, name);
         this.callFunc = callFunc;
+        addOperands(callFunc);
         funcRParams = new ArrayList<>();
     }
 
     public Call(Function callFunc) {
         super(callFunc.getTp(), Type.CALL, null);
         this.callFunc = callFunc;
+        addOperands(callFunc);
         funcRParams = new ArrayList<>();
     }
 
@@ -28,10 +30,14 @@ public class Call extends Instruction {
 
     public void setFuncRParams(ArrayList<Value> funcRParams) {
         this.funcRParams = funcRParams;
+        for (Value value: funcRParams) {
+            addOperands(value);
+        }
     }
 
     public void addFuncRParam(Value param) {
         funcRParams.add(param);
+        addOperands(param);
     }
 
     public boolean isNotVoid() {

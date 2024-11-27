@@ -11,6 +11,13 @@ public class RegManager {
     private HashMap<Integer, String> tempUseMap = new HashMap<>();    // real -> virtual
     private HashMap<Integer, String> argumentUseMap = new HashMap<>();   // argue -> virtual
     private HashMap<Integer, String> restoreMap;
+    private int discard = 8;
+    private MipsRegister discardReg = null;
+    private MipsRegister isUsing;
+
+    private String discardVirtual;
+
+    private final StackManager stackManager = StackManager.getInstance();
 
     public RegManager() {
         for (int i = 0; i < 32; i++) {
@@ -24,14 +31,34 @@ public class RegManager {
      * @param name 虚拟寄存器名
      */
     public MipsRegister setTempRegUse(String name) {
-        for (int i = 8; i < 26; i++) {
+        for (int i = 8; i < 18; i++) {
             if (tempUseMap.get(i).isEmpty()) {
+                isUsing = regPool.get(i);
                 tempUseMap.put(i, name);
                 return regPool.get(i);
             }
         }
         // 没有空的临时寄存器
-        return regPool.get(0);
+        // 随便选择一个临时寄存器返回
+        discardReg = regPool.get(discard);
+        while (discardReg.equals(isUsing)) {
+            updateDiscard();
+            discardReg = regPool.get(discard);
+        }
+        discardVirtual = tempUseMap.get(discard);
+        tempUseMap.put(discard, name);
+        // 把旧值扔到栈上,升级为局部变量
+        updateDiscard();
+        stackManager.push(discardVirtual);
+        return null;
+    }
+
+    public void updateDiscard() {
+        if (discard == 17) {
+            discard = 8;
+        } else {
+            discard++;
+        }
     }
 
     /**
@@ -40,13 +67,13 @@ public class RegManager {
      */
     public MipsRegister getTempReg(String virtualName) {
         // t0 -> t7, t8, t9
-        for (int i = 8; i < 26; i++) {
+        for (int i = 8; i < 18; i++) {
             if (tempUseMap.get(i).equals(virtualName)) {
+                isUsing = regPool.get(i);
                 return regPool.get(i);
             }
         }
-        return setTempRegUse(virtualName);
-
+        return null;
     }
 
     public HashMap<Integer, String> unusedMap() {
@@ -109,10 +136,13 @@ public class RegManager {
         if (reg == null) {
             return;
         }
-        if (reg.getNo() < 8 || reg.getNo() > 25) {
+        if (reg.getNo() < 8 || reg.getNo() > 17) {
             return;
         }
         tempUseMap.put(reg.getNo(), "");
+        if (reg.equals(isUsing)) {
+            isUsing = null;
+        }
     }
 
     public void clear() {
@@ -120,6 +150,18 @@ public class RegManager {
             tempUseMap.put(i, "");
             argumentUseMap.put(i, "");
         }
+    }
+
+    public int getDiscard() {
+        return discard;
+    }
+
+    public MipsRegister getDiscardReg() {
+        return discardReg;
+    }
+
+    public String getDiscardVirtual() {
+        return discardVirtual;
     }
 
     public HashMap<Integer, String> getTempUseMap() {
