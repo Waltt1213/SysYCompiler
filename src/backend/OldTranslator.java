@@ -320,7 +320,11 @@ public class OldTranslator {
         } else {
             MipsRegister temp0;
             if (stackManager.isGlobalData(addr.getFullName())) {    // 全局变量
-                textSegment.add(new MipsInstruction(SW, reg.getName(), addr.getName()));
+                if (value.getTp().getDataType() == ValueType.DataType.Integer8Ty) {
+                    textSegment.add(new MipsInstruction(SB, reg.getName(), addr.getName()));
+                } else {
+                    textSegment.add(new MipsInstruction(SW, reg.getName(), addr.getName()));
+                }
             } else {
                 temp0 = getReg(addr.getFullName());
                 if (value.getTp().getDataType() == ValueType.DataType.Integer8Ty) {
@@ -348,7 +352,11 @@ public class OldTranslator {
             if (stackManager.isGlobalData(addr.getFullName())) {    // 全局变量
                 MipsRegister temp = getReg(load.getFullName()); // load到临时寄存器
                 textSegment.add(new MipsInstruction(LA, temp.getName(), addr.getName()));
-                textSegment.add(new MipsInstruction(LW, temp.getName(), temp.getName(), "0"));
+                if (load.getTp().getDataType() == ValueType.DataType.Integer8Ty) {
+                    textSegment.add(new MipsInstruction(LB, temp.getName(), temp.getName(), "0"));
+                } else {
+                    textSegment.add(new MipsInstruction(LW, temp.getName(), temp.getName(), "0"));
+                }
             } else {
                 MipsRegister temp0 = getReg(addr.getFullName());
                 regManager.resetTempReg(temp0);
@@ -590,7 +598,7 @@ public class OldTranslator {
         Compare judge = (Compare) branch.getOperands().get(0);
         BasicBlock trueBranch = (BasicBlock) branch.getOperands().get(1);
         BasicBlock falseBranch = (BasicBlock) branch.getOperands().get(2);
-        if (curBlock.getDirect().getName().equals(falseBranch.getName())) {  // 直接后继是trueBranch
+        if (curBlock.getNeighbour().getName().equals(falseBranch.getName())) {  // 直接后继是trueBranch
             genBranchInstr(judge, trueBranch);
         } else {
             Compare compare = reverseIcmp(judge);

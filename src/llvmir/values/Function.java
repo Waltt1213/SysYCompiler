@@ -38,7 +38,7 @@ public class Function extends Value {
         if (!basicBlocks.isEmpty()) {
             BasicBlock last = basicBlocks.get(basicBlocks.size() - 1);
             // basicBlock.addPreBlock(last);
-            last.setDirect(basicBlock);
+            last.setNeighbour(basicBlock);
         }
         basicBlocks.add(basicBlock);
         basicBlock.setNeedName(true);
@@ -55,6 +55,7 @@ public class Function extends Value {
                 pre.removeSubBlock(basicBlock);
             }
             basicBlocks.remove(basicBlock);
+            basicBlock.remove();
         }
     }
 

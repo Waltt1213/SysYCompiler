@@ -1,19 +1,33 @@
 package llvmir.values.instr;
 
+import llvmir.Value;
 import llvmir.ValueType;
 import llvmir.values.BasicBlock;
+import llvmir.values.Constant;
 
 import java.util.ArrayList;
 
 public class Phi extends Instruction {
-    private ArrayList<BasicBlock> preBlocks;
+    private Value alloc;
+    private ArrayList<BasicBlock> preBlocks = new ArrayList<>();
 
-    public Phi(ValueType.Type vt, String name) {
-        super(vt, Type.PHI, name);
+    public Phi(Value value, String name) {
+        super(value.getTp().getInnerType(), Type.PHI, name);
+        alloc = value;
     }
 
-    public void addPreBlock(BasicBlock basicBlock) {
-        preBlocks.add(basicBlock);
+    public void setPreBlocks(ArrayList<BasicBlock> preBlocks) {
+        this.preBlocks = preBlocks;
+        for (int i = 0; i < preBlocks.size(); i++) {
+            operands.add(new Constant(tp, "0"));
+        }
+    }
+
+    public void replaceValue(Value value, BasicBlock block) {
+        int index = preBlocks.indexOf(block);
+        if (index >= 0) {
+            replaceValue(value, index);
+        }
     }
 
     @Override

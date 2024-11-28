@@ -9,7 +9,7 @@ import utils.FileIO;
 import java.io.IOException;
 
 public class Compiler {
-    private static final boolean Optimize = false;
+    private static final boolean Optimize = true;
 
     public static void main(String[] args) throws IOException {
         // Step 1: read source code from test file
@@ -33,15 +33,21 @@ public class Compiler {
         FileIO.printError(visitor.getErrors());
 
         // Step 5: Mid optimize
-        Optimizer optimizer = new Optimizer(visitor.getModule());
+        Module module = visitor.getModule();
+        Optimizer optimizer = new Optimizer(module);
         if (Optimize) {
+            module.setVirtualName();
+            FileIO.printLlvmIrResult(module, FileIO.NoOptimizeIrFilePath);
             optimizer.optimize();
         }
 
         // Step 6: print the LLVM IR
-        Module module = optimizer.getModule();
+        module = optimizer.getModule();
         module.setVirtualName();
-        FileIO.printLlvmIrResult(module);
+        FileIO.printLlvmIrResult(module, FileIO.llvmIrFilePath);
+        if (Optimize) {
+            FileIO.printLlvmIrResult(module, FileIO.OptimizeIrFilePath);
+        }
 
         // Step 7: generate Mips code and print the result
         OldTranslator oldTranslator = new OldTranslator(module);

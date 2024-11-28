@@ -4,10 +4,13 @@ import llvmir.Value;
 import llvmir.ValueType;
 import llvmir.values.instr.Branch;
 import llvmir.values.instr.Instruction;
+import llvmir.values.instr.Phi;
 import middle.SlotTracker;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 
 public class BasicBlock extends Value {
     private final LinkedList<Instruction> instructions;
@@ -17,16 +20,20 @@ public class BasicBlock extends Value {
     private boolean isTerminator;
     private final HashSet<BasicBlock> subsequents = new HashSet<>();
     private final HashSet<BasicBlock> precursor = new HashSet<>();
-    private HashSet<BasicBlock> dom = new HashSet<>();
+    private HashSet<BasicBlock> dom = new HashSet<>();  // 被支配的基本块集合
+    private HashSet<BasicBlock> domChild = new HashSet<>();
+    private HashSet<BasicBlock> DF = new HashSet<>();
+    private BasicBlock directDom;
     private HashSet<Value> uses = new HashSet<>();
     private HashSet<Value> defs = new HashSet<>();
-    private BasicBlock direct;
+    private BasicBlock neighbour;
 
     public BasicBlock(String name, Function function) {
         super(new ValueType.Type(ValueType.DataType.LabelTy), name);
         instructions = new LinkedList<>();
         parent = function;
         dom.add(this);
+        directDom = null;
     }
 
     public void setNeedName(boolean needName) {
@@ -82,12 +89,67 @@ public class BasicBlock extends Value {
         return dom;
     }
 
-    public void setDirect(BasicBlock basicBlock) {
-        direct = basicBlock;
+    public void calDirectDom() {
+        int maxDom = 0;
+        for (BasicBlock block: dom) {
+            if (!block.equals(this)) {
+                if (block.getDom().size() > maxDom) {
+                    maxDom = block.getDom().size();
+                    directDom = block;
+                }
+            }
+        }
+        if (directDom != null) {
+            directDom.addDomChild(this);
+        }
     }
 
-    public BasicBlock getDirect() {
-        return direct;
+    public void addDomChild(BasicBlock block) {
+        domChild.add(block);
+    }
+
+    public HashSet<BasicBlock> getDomChild() {
+        return domChild;
+    }
+
+    public BasicBlock getDirectDom() {
+        return directDom;
+    }
+
+    public boolean isDomBy(BasicBlock basicBlock) {   // basicBlock 支配 this
+        return dom.contains(basicBlock);
+    }
+
+    public boolean isStrictDomBy(BasicBlock basicBlock) {
+        return dom.contains(basicBlock) && !this.equals(basicBlock);
+    }
+
+    public boolean isDirectDomBy(BasicBlock block) {
+        if (this.equals(block) || !dom.contains(block)) {
+            return false;
+        }
+        for (BasicBlock otherDom: dom) {
+            if (!otherDom.equals(this) && otherDom.isDomBy(block)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public HashSet<BasicBlock> getDF() {
+        return DF;
+    }
+
+    public void setDF(HashSet<BasicBlock> DF) {
+        this.DF = DF;
+    }
+
+    public void setNeighbour(BasicBlock basicBlock) {
+        neighbour = basicBlock;
+    }
+
+    public BasicBlock getNeighbour() {
+        return neighbour;
     }
 
     public void appendInstr(Instruction instr, boolean setName) {
@@ -111,14 +173,24 @@ public class BasicBlock extends Value {
         }
     }
 
-    public void insertInstr(Instruction instr, Instruction value, boolean setName) {
-        if (!isTerminator) {
-            if (setName) {
-                instr.setName(SlotTracker.slot());
-            }
-            int index = instructions.indexOf(value);
-            instructions.add(index + 1, instr);
+    public void removeInstr(Instruction instr) {
+        instructions.remove(instr);
+    }
+
+    public void remove() {
+        super.remove();
+        while (!instructions.isEmpty()) {
+            instructions.get(0).remove();
         }
+    }
+
+    public Phi insertPhi(Value value) {
+        Phi phi = new Phi(value, "");
+        phi.setNeedName(true);
+        phi.setParent(this);
+        phi.setPreBlocks(new ArrayList<>(this.getPrecursor()));
+        instructions.add(0, phi);
+        return phi;
     }
 
     public void setTerminator(Instruction branch) {

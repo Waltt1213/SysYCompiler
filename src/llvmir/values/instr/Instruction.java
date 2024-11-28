@@ -1,6 +1,7 @@
 package llvmir.values.instr;
 
 import llvmir.User;
+import llvmir.Value;
 import llvmir.ValueType;
 import llvmir.values.BasicBlock;
 import middle.SlotTracker;
@@ -9,6 +10,7 @@ public class Instruction extends User {
     private final Type irType;
     private BasicBlock parent;
     private boolean needName = false;
+    private Instruction reachingDef = null;
 
     public Instruction(ValueType.Type vt, Type irType, String name) {
         super(vt, name);
@@ -90,6 +92,24 @@ public class Instruction extends User {
 
     public BasicBlock getParent() {
         return parent;
+    }
+
+    public void setReachingDef(Instruction reachingDef) {
+        this.reachingDef = reachingDef;
+    }
+
+    public Instruction getReachingDef() {
+        return reachingDef;
+    }
+
+    public void remove() {
+        parent.removeInstr(this);
+        parent = null;
+        super.remove();
+        for (Value operand: operands) {
+            operand.removeUser(this);
+        }
+        operands.clear();
     }
 
     public void setVirtualName() {

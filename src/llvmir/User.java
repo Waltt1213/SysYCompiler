@@ -30,6 +30,24 @@ public class User extends Value {
         }
     }
 
+    /**将就操作数替换为新操作数
+     * @param newValue 旧操作数
+     * @param oldValue 新操作数
+     */
+    public void replaceValue(Value newValue, Value oldValue) {
+        for (int i = 0; i < operands.size(); i++) {
+            if (operands.get(i).equals(oldValue)) {
+                operands.set(i, newValue);
+                newValue.addUser(this);
+            }
+        }
+    }
+
+    public void replaceValue(Value newValue, int index) {
+        operands.set(index, newValue);
+        newValue.addUser(this);
+    }
+
     @Override
     public String toString() {
         return super.toString();

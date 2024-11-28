@@ -20,7 +20,9 @@ public class FileIO {
     private static final String errorFilePath = String.valueOf(Paths.get("error.txt"));
     private static final String parserFilePath = String.valueOf(Paths.get("parser.txt"));
     private static final String symbolFilePath = String.valueOf(Paths.get("symbol.txt"));
-    private static final String llvmIrFilePath = String.valueOf(Paths.get("llvm_ir.txt"));
+    public static final String llvmIrFilePath = String.valueOf(Paths.get("llvm_ir.txt"));
+    public static final String NoOptimizeIrFilePath = String.valueOf(Paths.get("testfilei22371103王鹏_优化前中间代码.txt"));
+    public static final String OptimizeIrFilePath = String.valueOf(Paths.get("testfilei22371103王鹏_优化后中间代码.txt"));
     private static final String mipsFilePath = String.valueOf(Paths.get("mips.txt"));
 
     public static String readTestFile() throws IOException {
@@ -88,8 +90,8 @@ public class FileIO {
         fw.close();
     }
 
-    public static void printLlvmIrResult(Module module) throws IOException {
-        FileWriter fw = new FileWriter(llvmIrFilePath);
+    public static void printLlvmIrResult(Module module, String path) throws IOException {
+        FileWriter fw = new FileWriter(path);
         BufferedWriter bw = new BufferedWriter(fw);
         bw.write(module.toString());
         bw.close();

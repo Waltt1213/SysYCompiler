@@ -59,9 +59,17 @@ public class Value {
         return getTp().toString() + " " + getFullName();
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(name, tp, id);
+    public void remove() {
+        usersList.clear();
+    }
+
+    /**将使用旧value作为操作数的user替换旧操作数为新value
+     * @param newValue 新的操作数
+     */
+    public void replaceAllUses(Value newValue) {
+        for (User user: usersList) {
+            user.replaceValue(newValue, this);
+        }
     }
 
     @Override

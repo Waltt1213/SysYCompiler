@@ -57,7 +57,7 @@ public class Call extends Instruction {
         sb.append(callFunc.getTp().toString()).append(" ");
         sb.append(callFunc.getFullName()).append("(");
         for (int i = 0; i < funcRParams.size(); i++) {
-            sb.append(funcRParams.get(i).getDef());
+            sb.append(operands.get(i + 1).getDef());
             if (i < funcRParams.size() - 1) {
                 sb.append(", ");
             }
