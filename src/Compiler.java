@@ -1,4 +1,4 @@
-import backend.OldTranslator;
+import backend.normal.OldTranslator;
 import frontend.Lexer;
 import frontend.Parser;
 import llvmir.Module;

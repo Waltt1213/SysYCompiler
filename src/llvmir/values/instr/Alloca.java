@@ -58,6 +58,10 @@ public class Alloca extends Instruction {
         return tp.getDim();
     }
 
+    public Value def() {
+        return null;
+    }
+
     @Override
     public ValueType.Type getTp() {
         return new ValueType.PointerType(tp);

@@ -72,6 +72,10 @@ public class Value {
         }
     }
 
+    public Value def() {
+        return this;
+    }
+
     @Override
     public String toString() {
         return getDef();

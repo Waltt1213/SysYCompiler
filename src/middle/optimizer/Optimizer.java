@@ -11,21 +11,24 @@ public class Optimizer {
     private Module module;
     private ArrayList<Function> functions;
     private final Mem2reg mem2reg;
+    private final DCE dce;
 
     public Optimizer(Module module) {
         this.module = module;
         functions = module.getFunctions();
         mem2reg = new Mem2reg(module);
+        dce = new DCE(module);
     }
 
     public void optimize() {
         removeDeadBlocks(); // 移除死代码块
         buildDom();         // 计算支配关系
         calDF();            // 计算支配边界
-        mem2reg.buildSSA();
+        mem2reg.buildSSA(); // 实现SSA
+        dce.dce();  // 删除死代码
     }
 
-    // 优化1：删除死代码块
+    // 删除死代码块
     private void removeDeadBlocks() {
         for (Function function : functions) {
             dfsUnableReachBlock(function);
@@ -81,19 +84,10 @@ public class Optimizer {
                 }
             }
         } while (changed);
-//        System.out.println(function.getName() + ":");
-//        for (BasicBlock basicBlock: function.getBasicBlocks()) {
-//            System.out.println("block_" + basicBlock.getName() + ": ");
-//            for (BasicBlock block: basicBlock.getDom()) {
-//                System.out.println(block.getName());
-//            }
-//        }
-//        System.out.println("\n");
     }
 
     private void calDF() {
         for (Function function: functions) {
-            System.out.println(function.getName() + ":");
             calFuncDF(function);
         }
     }
@@ -117,13 +111,6 @@ public class Optimizer {
                 }
             }
         }
-        for (BasicBlock basicBlock: function.getBasicBlocks()) {
-            System.out.println("block_" + basicBlock.getName() + ": ");
-            for (BasicBlock block: basicBlock.getDF()) {
-                System.out.println(block.getName());
-            }
-        }
-        System.out.println("\n");
     }
 
     private void dfs(BasicBlock start,

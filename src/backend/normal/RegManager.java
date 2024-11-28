@@ -1,4 +1,4 @@
-package backend;
+package backend.normal;
 
 import backend.mips.MipsRegister;
 

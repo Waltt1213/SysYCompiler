@@ -52,6 +52,13 @@ public class Call extends Instruction {
         return funcRParams;
     }
 
+    public Value def() {
+        if (isNotVoid()) {
+            return this;
+        }
+        return null;
+    }
+
     public String getCall() {
         StringBuilder sb = new StringBuilder();
         sb.append(callFunc.getTp().toString()).append(" ");

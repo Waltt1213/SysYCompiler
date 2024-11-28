@@ -6,11 +6,12 @@ import llvmir.ValueType;
 import llvmir.values.BasicBlock;
 import middle.SlotTracker;
 
+import java.util.HashSet;
+
 public class Instruction extends User {
     private final Type irType;
     private BasicBlock parent;
     private boolean needName = false;
-    private Instruction reachingDef = null;
 
     public Instruction(ValueType.Type vt, Type irType, String name) {
         super(vt, name);
@@ -94,12 +95,12 @@ public class Instruction extends User {
         return parent;
     }
 
-    public void setReachingDef(Instruction reachingDef) {
-        this.reachingDef = reachingDef;
+    public Value def() {
+        return super.def();
     }
 
-    public Instruction getReachingDef() {
-        return reachingDef;
+    public HashSet<Value> use() {
+        return new HashSet<>(operands);
     }
 
     public void remove() {

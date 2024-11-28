@@ -1,11 +1,16 @@
 package llvmir.values.instr;
 
+import llvmir.Value;
 import llvmir.ValueType;
 
 public class Branch extends Instruction {
 
     public Branch(String name) {
         super(new ValueType.Type(ValueType.DataType.VoidTy), Type.BR, name);
+    }
+
+    public Value def() {
+        return null;
     }
 
     @Override

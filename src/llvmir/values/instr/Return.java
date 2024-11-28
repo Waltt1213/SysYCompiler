@@ -15,6 +15,11 @@ public class Return extends Instruction {
     }
 
     @Override
+    public Value def() {
+        return null;
+    }
+
+    @Override
     public String toString() {
         if (tp.getDataType().equals(ValueType.DataType.VoidTy)) {
             return "ret void";
