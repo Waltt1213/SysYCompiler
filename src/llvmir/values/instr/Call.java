@@ -5,6 +5,7 @@ import llvmir.ValueType;
 import llvmir.values.Function;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 
 public class Call extends Instruction {
     private Function callFunc;
@@ -57,6 +58,16 @@ public class Call extends Instruction {
             return this;
         }
         return null;
+    }
+
+    @Override
+    public HashSet<Value> use() {
+        if (callFunc.getName().equals("putstr")) {
+            return new HashSet<>();
+        }
+        HashSet<Value> use = new HashSet<>(operands);
+        use.remove(callFunc);
+        return use;
     }
 
     public String getCall() {

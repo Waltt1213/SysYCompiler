@@ -3,6 +3,8 @@ package llvmir.values.instr;
 import llvmir.Value;
 import llvmir.ValueType;
 
+import java.util.HashSet;
+
 public class Branch extends Instruction {
 
     public Branch(String name) {
@@ -11,6 +13,15 @@ public class Branch extends Instruction {
 
     public Value def() {
         return null;
+    }
+
+    @Override
+    public HashSet<Value> use() {
+        HashSet<Value> use = new HashSet<>();
+        if (getOperands().size() != 1) {
+            use.add(getOperands().get(0));
+        }
+        return use;
     }
 
     @Override

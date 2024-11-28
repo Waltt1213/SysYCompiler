@@ -12,20 +12,24 @@ public class Optimizer {
     private ArrayList<Function> functions;
     private final Mem2reg mem2reg;
     private final DCE dce;
+    private final LiveAnalyze activeAnalyze;
 
     public Optimizer(Module module) {
         this.module = module;
         functions = module.getFunctions();
         mem2reg = new Mem2reg(module);
         dce = new DCE(module);
+        activeAnalyze = new LiveAnalyze(module.getFunctions());
     }
 
-    public void optimize() {
+    public void optimizeSSA() {
         removeDeadBlocks(); // 移除死代码块
         buildDom();         // 计算支配关系
         calDF();            // 计算支配边界
         mem2reg.buildSSA(); // 实现SSA
         dce.dce();  // 删除死代码
+        module.setVirtualName();
+        activeAnalyze.analyzeActiveVar();
     }
 
     // 删除死代码块

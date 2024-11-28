@@ -26,6 +26,8 @@ public class BasicBlock extends Value {
     private BasicBlock directDom;
     private HashSet<Value> uses = new HashSet<>();
     private HashSet<Value> defs = new HashSet<>();
+    private HashSet<Value> ins = new HashSet<>();
+    private HashSet<Value> outs = new HashSet<>();
     private BasicBlock neighbour;
 
     public BasicBlock(String name, Function function) {
@@ -122,18 +124,6 @@ public class BasicBlock extends Value {
 
     public boolean isStrictDomBy(BasicBlock basicBlock) {
         return dom.contains(basicBlock) && !this.equals(basicBlock);
-    }
-
-    public boolean isDirectDomBy(BasicBlock block) {
-        if (this.equals(block) || !dom.contains(block)) {
-            return false;
-        }
-        for (BasicBlock otherDom: dom) {
-            if (!otherDom.equals(this) && otherDom.isDomBy(block)) {
-                return false;
-            }
-        }
-        return true;
     }
 
     public HashSet<BasicBlock> getDF() {
@@ -248,12 +238,28 @@ public class BasicBlock extends Value {
         this.uses = use;
     }
 
+    public void setIns(HashSet<Value> ins) {
+        this.ins = ins;
+    }
+
+    public HashSet<Value> getOuts() {
+        return outs;
+    }
+
     public HashSet<Value> getUses() {
         return uses;
     }
 
     public HashSet<Value> getDefs() {
         return defs;
+    }
+
+    public HashSet<Value> getIns() {
+        return ins;
+    }
+
+    public void setOuts(HashSet<Value> outs) {
+        this.outs = outs;
     }
 
     @Override

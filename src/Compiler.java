@@ -38,7 +38,7 @@ public class Compiler {
         if (Optimize) {
             module.setVirtualName();
             FileIO.printLlvmIrResult(module, FileIO.NoOptimizeIrFilePath);
-            optimizer.optimize();
+            optimizer.optimizeSSA();
         }
 
         // Step 6: print the LLVM IR
