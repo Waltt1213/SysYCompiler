@@ -42,13 +42,13 @@ public class DCE {
                     }
                 }
             }
-            for (User user: use.getUsersList()) {
-                if (user instanceof Instruction && !isUseful((Instruction) user)
-                        && !useful.contains(user)) {
-                    useSet.add(user);
-                    useful.add((Instruction) user);
-                }
-            }
+//            for (User user: use.getUsersList()) {
+//                if (user instanceof Instruction && !isUseful((Instruction) user)
+//                        && !useful.contains(user)) {
+//                    useSet.add(user);
+//                    useful.add((Instruction) user);
+//                }
+//            }
         }
         for (Function function: module.getFunctions()) {
             for (BasicBlock basicBlock: function.getBasicBlocks()) {

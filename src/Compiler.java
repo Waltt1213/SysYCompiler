@@ -42,7 +42,6 @@ public class Compiler {
         }
 
         // Step 6: print the LLVM IR
-        module = optimizer.getModule();
         module.setVirtualName();
         FileIO.printLlvmIrResult(module, FileIO.llvmIrFilePath);
         if (Optimize) {
@@ -50,6 +49,10 @@ public class Compiler {
         }
 
         // Step 7: generate Mips code and print the result
+        if (Optimize) {
+            optimizer.optimizeBackend();
+            FileIO.printLlvmIrResult(module, FileIO.optimizeFilePath);
+        }
         OldTranslator oldTranslator = new OldTranslator(module);
         oldTranslator.genMipsCode();
         FileIO.printMipsCode(oldTranslator.getDataSegment(), oldTranslator.getTextSegment());

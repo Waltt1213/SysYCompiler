@@ -44,6 +44,15 @@ public class Function extends Value {
         basicBlock.setNeedName(true);
     }
 
+    public void insertBlock(BasicBlock pre, BasicBlock next) {
+        if (!basicBlocks.isEmpty()) {
+            pre.setNeighbour(next);
+        }
+        int index = basicBlocks.indexOf(pre);
+        basicBlocks.add(index + 1, next);
+        next.setNeedName(true);
+    }
+
     public void removeBasicBlock(BasicBlock basicBlock) {
         if (basicBlocks.contains(basicBlock)) {
             // 删除后继联系

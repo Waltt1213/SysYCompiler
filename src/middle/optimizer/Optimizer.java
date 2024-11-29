@@ -12,6 +12,7 @@ public class Optimizer {
     private ArrayList<Function> functions;
     private final Mem2reg mem2reg;
     private final DCE dce;
+    private final RemovePhi removePhi;
     private final LiveAnalyze activeAnalyze;
 
     public Optimizer(Module module) {
@@ -19,6 +20,7 @@ public class Optimizer {
         functions = module.getFunctions();
         mem2reg = new Mem2reg(module);
         dce = new DCE(module);
+        removePhi = new RemovePhi(module);
         activeAnalyze = new LiveAnalyze(module.getFunctions());
     }
 
@@ -28,7 +30,10 @@ public class Optimizer {
         calDF();            // 计算支配边界
         mem2reg.buildSSA(); // 实现SSA
         dce.dce();  // 删除死代码
-        module.setVirtualName();
+    }
+
+    public void optimizeBackend() {
+        removePhi.removePhi();
         activeAnalyze.analyzeActiveVar();
     }
 

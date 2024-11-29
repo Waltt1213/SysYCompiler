@@ -37,6 +37,8 @@ public class Instruction extends User {
         TRUNC("trunc"),
         BR("br"),
         RET("ret"),
+        PC("pc"),
+        MOVE("move"),
         DEFAULT("default");
         private final String value;
 

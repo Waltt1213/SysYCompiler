@@ -31,8 +31,8 @@ public class User extends Value {
     }
 
     /**将就操作数替换为新操作数
-     * @param newValue 旧操作数
-     * @param oldValue 新操作数
+     * @param newValue 新操作数
+     * @param oldValue 旧操作数
      */
     public void replaceValue(Value newValue, Value oldValue) {
         for (int i = 0; i < operands.size(); i++) {

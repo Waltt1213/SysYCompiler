@@ -8,12 +8,11 @@ import llvmir.values.Constant;
 import java.util.ArrayList;
 
 public class Phi extends Instruction {
-    private Value alloc;
     private ArrayList<BasicBlock> preBlocks = new ArrayList<>();
+    private boolean removed = false;
 
     public Phi(Value value, String name) {
         super(value.getTp().getInnerType(), Type.PHI, name);
-        alloc = value;
     }
 
     public void setPreBlocks(ArrayList<BasicBlock> preBlocks) {
@@ -30,9 +29,16 @@ public class Phi extends Instruction {
         }
     }
 
+    public void setRemoved(boolean removed) {
+        this.removed = removed;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
+        if (removed) {
+            sb.append("; ");
+        }
         sb.append(getFullName()).append(" = phi ").append(tp.toString()).append(" ");
         for (int i = 0; i < preBlocks.size(); i++) {
             sb.append("[ ");

@@ -4,13 +4,12 @@ import llvmir.Value;
 import llvmir.ValueType;
 import llvmir.values.instr.Branch;
 import llvmir.values.instr.Instruction;
+import llvmir.values.instr.Pc;
 import llvmir.values.instr.Phi;
-import middle.SlotTracker;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 
 public class BasicBlock extends Value {
     private final LinkedList<Instruction> instructions;
@@ -18,6 +17,7 @@ public class BasicBlock extends Value {
     private boolean needName = false;   // 需要SlotTracker提供一个名字
     private boolean isLabeled;  // 需要打印出名字
     private boolean isTerminator;
+    private Instruction terminator;
     private final HashSet<BasicBlock> subsequents = new HashSet<>();
     private final HashSet<BasicBlock> precursor = new HashSet<>();
     private HashSet<BasicBlock> dom = new HashSet<>();  // 被支配的基本块集合
@@ -183,6 +183,15 @@ public class BasicBlock extends Value {
         return phi;
     }
 
+    public void insertBeforeTerminator(Instruction pc) {
+        pc.setParent(this);
+        if (isTerminator) {
+            instructions.add(instructions.size() - 1, pc);
+        } else {
+            instructions.add(pc);
+        }
+    }
+
     public void setTerminator(Instruction branch) {
         // 优化不必要的条件跳转
         if (branch instanceof Branch && branch.getOperands().size() == 3) {
@@ -201,11 +210,16 @@ public class BasicBlock extends Value {
             }
         }
         appendInstr(branch, false);
+        terminator = branch;
         isTerminator = true;
     }
 
     public void setTerminator(boolean terminator) {
         isTerminator = terminator;
+    }
+
+    public Instruction getTerminator() {
+        return terminator;
     }
 
     public boolean isTerminator() {
