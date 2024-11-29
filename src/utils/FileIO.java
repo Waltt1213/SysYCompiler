@@ -7,7 +7,7 @@ import frontend.Token;
 import frontend.TokenType;
 import frontend.ast.CompUnit;
 import llvmir.Module;
-import middle.SymbolTable;
+import middle.irbuilder.SymbolTable;
 
 import java.io.*;
 import java.nio.file.Paths;

@@ -4,7 +4,7 @@ import llvmir.User;
 import llvmir.Value;
 import llvmir.ValueType;
 import llvmir.values.BasicBlock;
-import middle.SlotTracker;
+import utils.SlotTracker;
 
 import java.util.HashSet;
 

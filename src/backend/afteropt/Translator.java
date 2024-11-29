@@ -1,7 +1,7 @@
-package backend.optimizer;
+package backend.afteropt;
 
 import backend.mips.*;
-import backend.normal.StackManager;
+import backend.beforeopt.StackManager;
 import llvmir.Module;
 import llvmir.Value;
 import llvmir.ValueType;

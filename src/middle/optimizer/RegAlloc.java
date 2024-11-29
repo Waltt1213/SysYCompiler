@@ -9,5 +9,5 @@ public class RegAlloc {
         this.module = module;
     }
 
-    
+
 }

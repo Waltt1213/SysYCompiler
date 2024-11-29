@@ -1,4 +1,4 @@
-package middle;
+package middle.irbuilder;
 
 import frontend.ast.FuncFParams;
 import llvmir.Value;

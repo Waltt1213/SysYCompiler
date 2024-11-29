@@ -1,4 +1,4 @@
-package middle;
+package middle.irbuilder;
 
 public class SymType {
     private final String type; // int or char

@@ -1,8 +1,8 @@
-import backend.normal.OldTranslator;
+import backend.beforeopt.OldTranslator;
 import frontend.Lexer;
 import frontend.Parser;
 import llvmir.Module;
-import middle.Visitor;
+import middle.irbuilder.Visitor;
 import middle.optimizer.Optimizer;
 import utils.FileIO;
 

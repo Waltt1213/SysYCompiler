@@ -1,4 +1,4 @@
-package backend.normal;
+package backend.beforeopt;
 
 import backend.mips.MipsData;
 import backend.mips.MipsInstrType;

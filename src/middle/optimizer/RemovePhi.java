@@ -5,7 +5,7 @@ import llvmir.Value;
 import llvmir.values.BasicBlock;
 import llvmir.values.Function;
 import llvmir.values.instr.*;
-import middle.SlotTracker;
+import utils.SlotTracker;
 
 import java.util.ArrayList;
 

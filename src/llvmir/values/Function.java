@@ -3,7 +3,7 @@ package llvmir.values;
 import llvmir.Value;
 import llvmir.ValueType;
 import llvmir.values.instr.Return;
-import middle.SlotTracker;
+import utils.SlotTracker;
 
 import java.util.ArrayList;
 

@@ -2,7 +2,7 @@ package llvmir;
 
 import llvmir.values.Function;
 import llvmir.values.GlobalVariable;
-import middle.SlotTracker;
+import utils.SlotTracker;
 
 import java.util.ArrayList;
 import java.util.HashMap;
