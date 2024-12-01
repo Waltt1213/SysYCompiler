@@ -679,6 +679,7 @@ public class Translator {
         } else {
             Compare compare = reverseIcmp(judge);
             genBranchInstr(compare, falseBranch);
+            reverseIcmp(compare);
         }
     }
 
