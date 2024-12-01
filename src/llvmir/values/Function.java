@@ -10,8 +10,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 
 public class Function extends Value {
-    private ArrayList<Argument> funcFParams;
-    private ArrayList<BasicBlock> basicBlocks;
+    private final ArrayList<Argument> funcFParams;
+    private final ArrayList<BasicBlock> basicBlocks;
     private final boolean isDefine;
     private boolean isNotVoid;
     private boolean isReturn;

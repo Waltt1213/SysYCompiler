@@ -21,7 +21,7 @@ public class BasicBlock extends Value {
     private final HashSet<BasicBlock> subsequents = new HashSet<>();
     private final HashSet<BasicBlock> precursor = new HashSet<>();
     private HashSet<BasicBlock> dom = new HashSet<>();  // 被支配的基本块集合
-    private HashSet<BasicBlock> domChild = new HashSet<>();
+    private final HashSet<BasicBlock> domChild = new HashSet<>();
     private HashSet<BasicBlock> DF = new HashSet<>();
     private BasicBlock directDom;
     private HashSet<Value> uses = new HashSet<>();
