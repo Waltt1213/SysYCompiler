@@ -1,4 +1,6 @@
+import backend.afteropt.Translator;
 import backend.beforeopt.OldTranslator;
+import backend.mips.MipsModule;
 import frontend.Lexer;
 import frontend.Parser;
 import llvmir.Module;
@@ -52,9 +54,14 @@ public class Compiler {
         if (Optimize) {
             optimizer.optimizeBackend();
             FileIO.printLlvmIrResult(module, FileIO.optimizeFilePath);
+            Translator translator = new Translator(module);
+            translator.genMipsCode();
+            MipsModule mipsModule = translator.getMipsModule();
+            FileIO.printMipsCode(mipsModule);
+        } else {
+            OldTranslator oldTranslator = new OldTranslator(module);
+            oldTranslator.genMipsCode();
+            FileIO.printMipsCode(oldTranslator.getDataSegment(), oldTranslator.getTextSegment());
         }
-        OldTranslator oldTranslator = new OldTranslator(module);
-        oldTranslator.genMipsCode();
-        FileIO.printMipsCode(oldTranslator.getDataSegment(), oldTranslator.getTextSegment());
     }
 }

@@ -5,11 +5,13 @@ import llvmir.ValueType;
 import llvmir.values.Function;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 
 public class Call extends Instruction {
     private Function callFunc;
     private ArrayList<Value> funcRParams;
+    private HashMap<Integer, Value> saveMap = new HashMap<>();
 
     public Call(String name, Function callFunc) {
         super(callFunc.getTp(), Type.CALL, name);
@@ -53,6 +55,14 @@ public class Call extends Instruction {
         return funcRParams;
     }
 
+    public HashMap<Integer, Value> getSaveMap() {
+        return saveMap;
+    }
+
+    public void setSaveMap(HashMap<Integer, Value> saveMap) {
+        this.saveMap = saveMap;
+    }
+
     public Value def() {
         if (isNotVoid()) {
             return this;
@@ -68,6 +78,18 @@ public class Call extends Instruction {
         HashSet<Value> use = new HashSet<>(operands);
         use.remove(callFunc);
         return use;
+    }
+
+    @Override
+    public void replaceValue(Value newValue, Value oldValue) {
+        for (int i = 0; i < operands.size(); i++) {
+            if (operands.get(i).equals(oldValue)) {
+                operands.set(i, newValue);
+                newValue.addUser(this);
+                int index = funcRParams.indexOf(oldValue);
+                funcRParams.set(index, newValue);
+            }
+        }
     }
 
     public String getCall() {

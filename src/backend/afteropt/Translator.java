@@ -1,5 +1,6 @@
 package backend.afteropt;
 
+import backend.beforeopt.RegManager;
 import backend.mips.*;
 import backend.beforeopt.StackManager;
 import llvmir.Module;
@@ -11,7 +12,6 @@ import llvmir.values.instr.*;
 import java.util.*;
 
 import static backend.mips.MipsInstrType.*;
-import static backend.mips.MipsInstrType.SW;
 
 /**
  * 后端分为两步：第一步直接将llvm转化成mips,仍使用虚拟寄存器；
@@ -20,16 +20,21 @@ import static backend.mips.MipsInstrType.SW;
  */
 public class Translator {
     private final Module module;
-    private MipsModule mipsModule;
-    private StackManager stackManager = StackManager.getInstance();
-    private HashMap<Value, VirtualRegister> value2virtualMap = new HashMap<>();
+    private final MipsModule mipsModule;
+    private final StackManager stackManager = StackManager.getInstance();
+    private final RegManager regManager = new RegManager();
     private MipsFunction currentFunction;
+    private Function irFunction;
     private BasicBlock curBlock;
     private int maxParams = 0;
 
     public Translator(Module module) {
         this.module = module;
         mipsModule = new MipsModule();
+    }
+
+    public MipsModule getMipsModule() {
+        return mipsModule;
     }
 
     public void genMipsCode() {
@@ -54,6 +59,7 @@ public class Translator {
         calMaxParam(functions);
         Collections.reverse(functions); // 翻转list,先解析main
         for (Function function: functions) {
+            irFunction = function;
             currentFunction = new MipsFunction(function.getName());
             mipsModule.addFunction(currentFunction);
             genFunction(function);
@@ -98,18 +104,14 @@ public class Translator {
     }
 
     public void genFunction(Function function) {
-        // currentFunction.addInstr(new MipsInstruction(function.getName()));
         // 函数序言
         allocStackFrame(function);
-        // TODO: 如果是非叶子函数，则需要将a0->a3压栈
         for (BasicBlock basicBlock: function.getBasicBlocks()) {
             curBlock = basicBlock;
             genBasicBlock(basicBlock);
         }
         // 函数尾声
         stackManager.clear();
-        // regManager.clear();
-        value2virtualMap.clear();
     }
 
     /**
@@ -124,7 +126,6 @@ public class Translator {
      * </p>
      */
     public void allocStackFrame(Function function) {
-        // TODO： 当前方法只压入了 ra 和 fp
         int size = maxParams * 4;
         // 从栈顶到栈底记录映射，依次为 argument, save reg， local var, fp, ra
         // 记录参数映射
@@ -154,24 +155,27 @@ public class Translator {
         // 调用者的传参在栈中位置构建字典
         for (int i = 0; i < function.getArgc(); i++) {
             if (i > 3) {
-                stackManager.putVirtualReg(function.getFuncFParams().get(i).getFullName(), 4);
+                int ptr = stackManager.putVirtualReg(function.getFuncFParams().get(i).getFullName(), 4);
+                if (irFunction.getGlobalRegsMap().containsKey(function.getFuncFParams().get(i))) {
+                    int reg = function.getGlobalRegsMap().get(function.getFuncFParams().get(i));
+                    MipsRegister phyReg = regManager.getReg(reg);
+                    currentFunction.addInstr(new MipsInstruction(LW, phyReg.getName(), "$sp", String.valueOf(ptr)));
+                }
             } else {
+                if (irFunction.getGlobalRegsMap().containsKey(function.getFuncFParams().get(i))) {
+                    int reg = function.getGlobalRegsMap().get(function.getFuncFParams().get(i));
+                    MipsRegister phyReg = regManager.getReg(reg);
+                    currentFunction.addInstr(new MipsInstruction(MOVE, phyReg.getName(), "$a" + i));
+                }
                 stackManager.addPtr(4);
             }
         }
     }
 
     public void allocArguments(Function function) {
-        ArrayList<Argument> funcFParams = function.getFuncFParams();
-        // 设置函数参数与寄存器映射 a0->a3
-        for (int i = 0; i < funcFParams.size() && i < 4; i++) {
-            // regManager.setArgueRegUse(funcFParams.get(i).getFullName(), 4 + i);
-            VirtualRegister argue = new VirtualRegister(funcFParams.get(i).getFullName());
-            value2virtualMap.put(funcFParams.get(i), argue);
-        }
         // 记录argument->ptr映射
         for (int i = 0; i < maxParams; i++) {
-            stackManager.putVirtualReg("$a" + i, 4); // TODO
+            stackManager.setVirtualReg("$param" + i, -4 * (maxParams - i)); // TODO
         }
     }
 
@@ -189,6 +193,13 @@ public class Translator {
                     localVarSize += size;
                     // 将local Var在栈空间的位置确定，暂时不填值
                     stackManager.putVirtualReg(alloca.getFullName(), size);
+                } else if (irFunction.getValueInStack().contains(instruction.def())) {
+                    localVarSize += 4;
+                    stackManager.putVirtualReg(instruction.def().getFullName(), 4);
+                } else if (instruction instanceof Move && !(((Move) instruction).getDst() instanceof Instruction)) {
+                    localVarSize += 4;
+                    stackManager.putVirtualReg(((Move) instruction).getDst().getFullName(), 4);
+                    irFunction.getValueInStack().add(((Move) instruction).getDst());
                 }
             }
         }
@@ -228,34 +239,50 @@ public class Translator {
             currentFunction.addInstr(new MipsInstruction("# " + instruction));
             genCompare((Compare) instruction);
         } else if (instruction instanceof Branch) {
-            // genBranch((Branch) instruction);
+            genBranch((Branch) instruction);
+        } else if (instruction instanceof Move) {
+            genMove((Move) instruction);
         }
+    }
+
+    public void genMove(Move move) {
+        currentFunction.addInstr(new MipsInstruction("# " + move));
+        Value dst = move.getDst();
+        Value src = move.getSrc();
+        MipsRegister srcReg = getReg(src);
+        if (src instanceof Constant && !src.getName().equals("0")) {
+            currentFunction.addInstr(new MipsInstruction(LI, srcReg.getName(), src.getName()));
+        }
+        if (dst instanceof Phi) {
+            saveInStack(dst, srcReg);
+            return;
+        }
+        MipsRegister dstReg = getReg(dst);
+        if (!dstReg.getName().equals(srcReg.getName())) {
+            currentFunction.addInstr(new MipsInstruction(MOVE, dstReg.getName(), srcReg.getName()));
+        }
+        saveInStack(dst, dstReg);
     }
 
     public void genStore(Store store) {
         currentFunction.addInstr(new MipsInstruction("# " + store.toString()));
         Value value = store.getOperands().get(0);
         Value addr = store.getOperands().get(1);
-        // MipsRegister reg = regManager.getReg(value.getFullName());
-        VirtualRegister reg = getVirtualReg(value);
-        if (value instanceof Constant) {
+        MipsRegister reg = getReg(value);
+        if (value instanceof Constant && !value.getName().equals("0")) {
             currentFunction.addInstr(new MipsInstruction(LI, reg.getName(), value.getName()));
         }
-        int ptr = 0;
-        if ((ptr = stackManager.getVirtualPtr(addr.getFullName())) >= 0) {  // 局部变量
-            if (value instanceof Argument && Integer.parseInt(value.getName()) > 3) {
-                int arguePtr = stackManager.getVirtualPtr(value.getFullName());
-                currentFunction.addInstr(new MipsInstruction(LW, reg.getName(), "$sp", String.valueOf(arguePtr)));
-            }
-            currentFunction.addInstr(new MipsInstruction(SW, reg.getName(), "$sp", String.valueOf(ptr)));
-        } else {
-            VirtualRegister temp0;
-            if (stackManager.isGlobalData(addr.getFullName())) {    // 全局变量
-                temp0 = getVirtualReg(addr); // 加载全局变量地址
-                currentFunction.addInstr(new MipsInstruction(LA, temp0.getName(), addr.getName()));
-                currentFunction.addInstr(new MipsInstruction(SW, reg.getName(), temp0.getName(), "0"));
+        if (stackManager.isGlobalData(addr.getFullName())) {    // 全局变量
+            if (value.getTp().getDataType() == ValueType.DataType.Integer8Ty) {
+                currentFunction.addInstr(new MipsInstruction(SB, reg.getName(), addr.getName()));
             } else {
-                temp0 = getVirtualReg(addr);
+                currentFunction.addInstr(new MipsInstruction(SW, reg.getName(), addr.getName()));
+            }
+        } else {
+            MipsRegister temp0 = getReg(addr);
+            if (value.getTp().getDataType() == ValueType.DataType.Integer8Ty) {
+                currentFunction.addInstr(new MipsInstruction(SB, reg.getName(), temp0.getName(), "0"));
+            } else {
                 currentFunction.addInstr(new MipsInstruction(SW, reg.getName(), temp0.getName(), "0"));
             }
         }
@@ -264,24 +291,23 @@ public class Translator {
     public void genLoad(Load load) {
         currentFunction.addInstr(new MipsInstruction("# " + load.toString()));
         Value addr = load.getOperands().get(0);
-        int ptr = stackManager.getVirtualPtr(addr.getFullName());
-        if (ptr >= 0) { // 临时变量
-            VirtualRegister temp = getVirtualReg(load); // load到临时寄存器
-            currentFunction.addInstr(new MipsInstruction(LW, temp.getName(), "$sp", String.valueOf(ptr)));
-        } else {
-            if (stackManager.isGlobalData(addr.getFullName())) {    // 全局变量
-                VirtualRegister temp0 = getVirtualReg(addr); // 加载全局变量地址
-                currentFunction.addInstr(new MipsInstruction(LA, temp0.getName(), addr.getName()));
-                VirtualRegister temp = getVirtualReg(load); // load到临时寄存器
-                currentFunction.addInstr(new MipsInstruction(LW, temp.getName(), temp0.getName(), "0"));
-                // regManager.resetTempReg(temp0);
+        MipsRegister temp = getReg(load); // load到临时寄存器
+        if (stackManager.isGlobalData(addr.getFullName())) {    // 全局变量
+            // currentFunction.addInstr(new MipsInstruction(LA, temp.getName(), addr.getName()));
+            if (load.getTp().getDataType() == ValueType.DataType.Integer8Ty) {
+                currentFunction.addInstr(new MipsInstruction(LB, temp.getName(), addr.getName()));
             } else {
-                VirtualRegister temp0 = getVirtualReg(addr);
-                VirtualRegister temp = getVirtualReg(load); // load到临时寄存器
+                currentFunction.addInstr(new MipsInstruction(LW, temp.getName(), addr.getName()));
+            }
+        } else {
+            MipsRegister temp0 = getReg(addr);
+            if (load.getTp().getDataType() == ValueType.DataType.Integer8Ty) {
+                currentFunction.addInstr(new MipsInstruction(LB, temp.getName(), temp0.getName(), "0"));
+            } else {
                 currentFunction.addInstr(new MipsInstruction(LW, temp.getName(), temp0.getName(), "0"));
-                // regManager.resetTempReg(temp0);
             }
         }
+        saveInStack(load, temp);
     }
 
     public void genReturn(Return ret, boolean isMain) {
@@ -290,11 +316,10 @@ public class Translator {
         if (!ret.getOperands().isEmpty()) {
             Value value = ret.getOperands().get(0);
             if (value instanceof Constant) {
-                currentFunction.addInstr(new MipsInstruction(ADDI, "$v0", "$zero", value.getName()));
+                currentFunction.addInstr(new MipsInstruction(ADDIU, "$v0", "$zero", value.getName()));
             } else {
-                VirtualRegister reg = getVirtualReg(value);
+                MipsRegister reg = getReg(value);
                 currentFunction.addInstr(new MipsInstruction(ADDU, "$v0", "$zero", reg.getName()));
-                //regManager.resetTempReg(reg);
             }
         }
         // 恢复ra
@@ -317,17 +342,19 @@ public class Translator {
     public void genCall(Call call) {
         currentFunction.addInstr(new MipsInstruction("# " + call.toString()));
         Function function = call.getCallFunc();
-        ArrayList<Argument> arguments = function.getFuncFParams();
         if (function.getName().equals("putstr")) {
             GetElementPtr getElementPtr = (GetElementPtr) call.getFuncRParams().get(0);
             currentFunction.addInstr(new MipsInstruction(LA, "$a0", getElementPtr.getOperands().get(0).getName()));
             // 跳转到目标函数
             currentFunction.addInstr(new MipsInstruction(JAL, function.getName()));
-            if (function.isNotVoid()) {
-                VirtualRegister ret = getVirtualReg(call);
-                currentFunction.addInstr(new MipsInstruction(MOVE, ret.getName(), "$v0"));
-            }
             return;
+        }
+        // 保存现场
+        HashMap<Integer, Value> unused = call.getSaveMap();
+        for (Integer reg: unused.keySet()) {
+            MipsRegister tempReg = regManager.getReg(reg);
+            int ptr = stackManager.getVirtualPtr(tempReg.getName());
+            currentFunction.addInstr(new MipsInstruction(SW, tempReg.getName(), "$sp", String.valueOf(ptr)));
         }
         // 参数传递
         ArrayList<Value> funcRParams = call.getFuncRParams();
@@ -338,43 +365,33 @@ public class Translator {
                     String constVar = value.getName();
                     currentFunction.addInstr(new MipsInstruction(LI, "$a" + i, constVar));
                 } else {
-                    VirtualRegister argue = getVirtualReg(value);
+                    MipsRegister argue = getReg(value);
                     currentFunction.addInstr(new MipsInstruction(ADDU, "$a" + i, "$zero", argue.getName()));
                 }
             } else {
-                int ptr = stackManager.getVirtualPtr("$a" + i);
-                if (value instanceof Constant) {
-                    VirtualRegister temp = getVirtualReg(value);
+                int ptr = stackManager.getVirtualPtr("$param" + i);
+                MipsRegister temp = getReg(value);
+                if (value instanceof Constant && !value.getName().equals("0")) {
                     currentFunction.addInstr(new MipsInstruction(LI, temp.getName(), value.getName()));
-                    currentFunction.addInstr(new MipsInstruction(SW, temp.getName(), "$sp", String.valueOf(ptr)));
-                } else {
-                    VirtualRegister argue = getVirtualReg(value);
-                    currentFunction.addInstr(new MipsInstruction(SW, argue.getName(), "$sp", String.valueOf(ptr)));
                 }
+                currentFunction.addInstr(new MipsInstruction(SW, temp.getName(), "$sp", String.valueOf(ptr)));
             }
         }
-        // 保存现场
-//        HashMap<Integer, String> unused = regManager.unusedMap();
-//        for (Map.Entry<Integer, String> entry: unused.entrySet()) {
-//            MipsRegister tempReg = regManager.getReg(entry.getKey());
-//            int ptr = stackManager.getVirtualPtr(tempReg.getName());
-//            currentFunction.addInstr(new MipsInstruction(SW, tempReg.getName(), "$sp", String.valueOf(ptr)));
-//        }
         // 跳转到目标函数
         currentFunction.addInstr(new MipsInstruction(JAL, function.getName()));
         currentFunction.addInstr(new MipsInstruction(NOP));
+        // 恢复现场
+        for (Integer reg: unused.keySet()) {
+            MipsRegister temp = regManager.getReg(reg);
+            int ptr = stackManager.getVirtualPtr(temp.getName());
+            currentFunction.addInstr(new MipsInstruction(LW,temp.getName(), "$sp", String.valueOf(ptr)));
+        }
         // 回到调用者
         if (function.isNotVoid()) {
-            VirtualRegister ret = getVirtualReg(call);
+            MipsRegister ret = getReg(call);
             currentFunction.addInstr(new MipsInstruction(MOVE, ret.getName(), "$v0"));
+            saveInStack(call, ret);
         }
-        // 恢复现场
-//        HashMap<Integer, String> restoreMap = regManager.getRestoreMap();
-//        for (Map.Entry<Integer, String> entry: restoreMap.entrySet()) {
-//            MipsRegister temp = regManager.getReg(entry.getKey());
-//            int ptr = stackManager.getVirtualPtr(temp.getName());
-//            currentFunction.addInstr(new MipsInstruction(LW,temp.getName(), "$sp", String.valueOf(ptr)));
-//        }
     }
 
     public void genBinaryOperator(BinaryOperator binaryOperator) {
@@ -399,121 +416,181 @@ public class Translator {
     public void genAddInstr(BinaryOperator binaryOperator) {
         Value operand1 = binaryOperator.getOperands().get(0);
         Value operand2 = binaryOperator.getOperands().get(1);
-        VirtualRegister temp = getVirtualReg(binaryOperator);
-        if (operand1 instanceof Constant) {
-            VirtualRegister reg = getVirtualReg(operand2);
-            currentFunction.addInstr(new MipsInstruction(ADDI, temp.getName(), reg.getName(), operand1.getName()));
-            // regManager.resetTempReg(reg);
-        } else if (operand2 instanceof Constant) {
-            VirtualRegister reg = getVirtualReg(operand1);
-            currentFunction.addInstr(new MipsInstruction(ADDI, temp.getName(), reg.getName(), operand2.getName()));
-            // regManager.resetTempReg(reg);
+        MipsRegister temp = getReg(binaryOperator);
+        if (operand1 instanceof Constant && operand2 instanceof Constant) {
+            int ans = Integer.parseInt(operand1.getName()) + Integer.parseInt(operand2.getName());
+            currentFunction.addInstr(new MipsInstruction(ADDIU, temp.getName(), "$zero", String.valueOf(ans)));
         } else {
-            VirtualRegister op1 = getVirtualReg(operand1);
-            VirtualRegister op2 = getVirtualReg(operand2);
-            currentFunction.addInstr(new MipsInstruction(ADDU, temp.getName(), op1.getName(), op2.getName()));
+            if (operand1 instanceof Constant) {
+                MipsRegister reg = getReg(operand2);
+                currentFunction.addInstr(new MipsInstruction(ADDIU, temp.getName(), reg.getName(), operand1.getName()));
+            } else if (operand2 instanceof Constant) {
+                MipsRegister reg = getReg(operand1);
+                currentFunction.addInstr(new MipsInstruction(ADDIU, temp.getName(), reg.getName(), operand2.getName()));
+            } else {
+                MipsRegister op1 = getReg(operand1);
+                MipsRegister op2 = getReg(operand2);
+                currentFunction.addInstr(new MipsInstruction(ADDU, temp.getName(), op1.getName(), op2.getName()));
+            }
         }
+        saveInStack(binaryOperator, temp);
     }
 
     public void genSubInstr(BinaryOperator binaryOperator) {
         Value operand1 = binaryOperator.getOperands().get(0);
         Value operand2 = binaryOperator.getOperands().get(1);
-        VirtualRegister temp = getVirtualReg(binaryOperator);
-        if (operand1 instanceof Constant) {
-            // 第一个操作数是常数，需要addi $t0, $zero, op1, 再subu $t2, $t0, $t1
-            VirtualRegister temp0 = getVirtualReg(operand1);
-            currentFunction.addInstr(new MipsInstruction(ADDI, temp0.getName(), "$zero", operand1.getName()));
-            VirtualRegister reg = getVirtualReg(operand2);
-            currentFunction.addInstr(new MipsInstruction(SUBU, temp.getName(), temp0.getName(), reg.getName()));
-        } else if (operand2 instanceof Constant) {
-            VirtualRegister reg = getVirtualReg(operand1);
-            currentFunction.addInstr(new MipsInstruction(SUBI, temp.getName(), reg.getName(), operand2.getName()));
+        if (operand1 instanceof Constant && operand2 instanceof Constant) {
+            MipsRegister temp = getReg(binaryOperator);
+            int ans = Integer.parseInt(operand1.getName()) - Integer.parseInt(operand2.getName());
+            currentFunction.addInstr(new MipsInstruction(ADDIU, temp.getName(), "$zero", String.valueOf(ans)));
+            saveInStack(binaryOperator, temp);
         } else {
-            VirtualRegister op1 = getVirtualReg(operand1);
-            VirtualRegister op2 = getVirtualReg(operand2);
-            currentFunction.addInstr(new MipsInstruction(SUBU, temp.getName(), op1.getName(), op2.getName()));
+            MipsRegister temp = getReg(binaryOperator);
+            if (operand1 instanceof Constant) {
+                // 第一个操作数是常数，需要addi $t9, $zero, op1, 再subu $t2, $t9, $t1
+                MipsRegister temp0 = getReg(operand1);
+                if (!operand1.getName().equals("0")) {
+                    currentFunction.addInstr(new MipsInstruction(ADDIU, temp0.getName(), "$zero", operand1.getName()));
+                }
+                MipsRegister reg = getReg(operand2);
+                currentFunction.addInstr(new MipsInstruction(SUBU, temp.getName(), temp0.getName(), reg.getName()));
+            } else if (operand2 instanceof Constant) {
+                MipsRegister reg = getReg(operand1);
+                currentFunction.addInstr(new MipsInstruction(SUBI, temp.getName(), reg.getName(), operand2.getName()));
+            } else {
+                MipsRegister op1 = getReg(operand1);
+                MipsRegister op2 = getReg(operand2);
+                currentFunction.addInstr(new MipsInstruction(SUBU, temp.getName(), op1.getName(), op2.getName()));
+            }
+            saveInStack(binaryOperator, temp);
         }
+
     }
 
     public void genHiLoInst(BinaryOperator binaryOperator, Instruction.Type op) {
         Value operand1 = binaryOperator.getOperands().get(0);
         Value operand2 = binaryOperator.getOperands().get(1);
-        VirtualRegister op1 = getVirtualReg(operand1);
-        VirtualRegister op2 = getVirtualReg(operand2);
-        if (operand1 instanceof Constant) {
-            currentFunction.addInstr(new MipsInstruction(ADDI, op1.getName(), "$zero", operand1.getName()));
+        if (operand1 instanceof Constant && operand2 instanceof Constant) {
+            int ans;
+            switch (op) {
+                case MUL:
+                    ans = Integer.parseInt(operand1.getName()) * Integer.parseInt(operand2.getName());
+                    break;
+                case SDIV:
+                    ans = Integer.parseInt(operand1.getName()) / Integer.parseInt(operand2.getName());
+                    break;
+                case SREM:
+                    ans = Integer.parseInt(operand1.getName()) % Integer.parseInt(operand2.getName());
+                    break;
+                default:
+                    ans = 0;
+            }
+            MipsRegister temp = getReg(binaryOperator);
+            currentFunction.addInstr(new MipsInstruction(ADDIU, temp.getName(), "$zero", String.valueOf(ans)));
+            saveInStack(binaryOperator, temp);
+            return;
         }
-        if (operand2 instanceof Constant) {
-            currentFunction.addInstr(new MipsInstruction(ADDI, op2.getName(), "$zero", operand2.getName()));
+        MipsRegister op1 = getReg(operand1);
+        MipsRegister op2 = getReg(operand2);
+        if (operand1 instanceof Constant && !operand1.getName().equals("0")) {
+            currentFunction.addInstr(new MipsInstruction(ADDIU, op1.getName(), "$zero", operand1.getName()));
+        }
+        if (operand2 instanceof Constant && !operand2.getName().equals("0")) {
+            currentFunction.addInstr(new MipsInstruction(ADDIU, op2.getName(), "$zero", operand2.getName()));
         }
         MipsInstrType type = op == Instruction.Type.MUL ? MULT : DIV;
         currentFunction.addInstr(new MipsInstruction(type, op1.getName(), op2.getName()));
-        VirtualRegister temp = getVirtualReg(binaryOperator);
+        MipsRegister temp = getReg(binaryOperator);
         if (op == Instruction.Type.MUL || op == Instruction.Type.SDIV) {
             currentFunction.addInstr(new MipsInstruction(MFLO, temp.getName()));
         } else {
             currentFunction.addInstr(new MipsInstruction(MFHI, temp.getName()));
         }
+        saveInStack(binaryOperator, temp);
     }
 
     public void genTrunc(Trunc trunc) {
         currentFunction.addInstr(new MipsInstruction("# " + trunc));
         Value op1 = trunc.getOperands().get(0);
-        VirtualRegister reg = getVirtualReg(op1);
-        value2virtualMap.put(trunc, reg);
+        MipsRegister temp = getReg(trunc);
+        MipsRegister reg = getReg(op1);
+        if (op1 instanceof Constant && !op1.getName().equals("0")) {
+            currentFunction.addInstr(new MipsInstruction(LI,reg.getName(), op1.getName()));
+        }
+        currentFunction.addInstr(new MipsInstruction(ANDI, temp.getName(), reg.getName(), "0xFF"));
+        saveInStack(trunc, temp);
     }
 
     public void genZext(Zext zext) {
         currentFunction.addInstr(new MipsInstruction("# " + zext));
         Value op1 = zext.getOperands().get(0);
-        VirtualRegister reg = getVirtualReg(op1);
-        value2virtualMap.put(zext, reg);
+        MipsRegister temp = getReg(zext);
+        MipsRegister reg = getReg(op1);
+        if (op1 instanceof Constant && !op1.getName().equals("0")) {
+            currentFunction.addInstr(new MipsInstruction(LI,reg.getName(), op1.getName()));
+        }
+        currentFunction.addInstr(new MipsInstruction(ANDI, temp.getName(), reg.getName(), "0xFF"));
+        saveInStack(zext,temp);
     }
 
     public void genElementPtr(GetElementPtr getElementPtr) {    // 计算地址
         currentFunction.addInstr(new MipsInstruction("# " + getElementPtr.toString()));
-        Value firstAddr = getElementPtr.getOperands().get(0);   // 可能来自reg，也可能来自栈
-        Value bis1 = getElementPtr.getOperands().get(1);
-        int ptr = 0;
+        Value firstAddr = getElementPtr.getOperands().get(0);
         int firstPtr = stackManager.getVirtualPtr(firstAddr.getFullName());
-        VirtualRegister first;
-        VirtualRegister ptrReg;
+        Value bis1 = getElementPtr.getOperands().get(1);
+        MipsRegister ptrReg = getReg(getElementPtr);;
         // 获取首地址
-        if (firstPtr >= 0) {    // 来自栈
-            first = VirtualRegister.vSp;
-            ptr += firstPtr;
+        if (firstPtr >= 0 && firstAddr instanceof Alloca) {    // 可能为数组
+            currentFunction.addInstr(new MipsInstruction(ADDIU, ptrReg.getName(), "$sp", String.valueOf(firstPtr)));
         } else {
-            first = getVirtualReg(firstAddr);
             if (stackManager.isGlobalData(firstAddr.getFullName())) {
-                 // 加载全局变量地址
-                currentFunction.addInstr(new MipsInstruction(LA, first.getName(), firstAddr.getName())); // 首地址为全局变量地址
+                currentFunction.addInstr(new MipsInstruction(LA, ptrReg.getName(), firstAddr.getName()));
+            } else {
+                MipsRegister temp = getReg(firstAddr);
+                currentFunction.addInstr(new MipsInstruction(ADDU, ptrReg.getName(), "$zero", temp.getName()));
             }
         }
+        // 加上第一部分索引
         if (bis1 instanceof Constant) {
-            ptr += Integer.parseInt(bis1.getName()) * 4; // 指针初始化
+            int ptr = Integer.parseInt(bis1.getName()) * 4;
+            if (firstAddr.getTp().getDataType() == ValueType.DataType.Integer8Ty) {
+                ptr = Integer.parseInt(bis1.getName());
+            }
+            if (ptr != 0) {
+                currentFunction.addInstr(new MipsInstruction(ADDIU, ptrReg.getName(), ptrReg.getName(), String.valueOf(ptr)));
+            }
         } else {
-            VirtualRegister temp = getVirtualReg(bis1);
-            currentFunction.addInstr(new MipsInstruction(SLL, temp.getName(), temp.getName(), String.valueOf(2)));
-            currentFunction.addInstr(new MipsInstruction(ADDU, first.getName(), first.getName(), temp.getName()));
+            MipsRegister temp = getReg(bis1);
+            if (firstAddr.getTp().getDataType() == ValueType.DataType.Integer32Ty) {
+                currentFunction.addInstr(new MipsInstruction(SLL, "$v1", temp.getName(), String.valueOf(2)));
+                currentFunction.addInstr(new MipsInstruction(ADDU, ptrReg.getName(), ptrReg.getName(), "$v1"));
+            } else {
+                currentFunction.addInstr(new MipsInstruction(ADDU, ptrReg.getName(), ptrReg.getName(), temp.getName()));
+            }
+
         }
         if (getElementPtr.getOperands().size() > 2) {
             Value bis2 = getElementPtr.getOperands().get(2);
             if (bis2 instanceof Constant) {
-                ptr += Integer.parseInt(bis2.getName()) * 4;
-                ptrReg = getVirtualReg(getElementPtr);
-                currentFunction.addInstr(new MipsInstruction(ADDIU, ptrReg.getName(), first.getName(), String.valueOf(ptr)));
+                int ptr = Integer.parseInt(bis2.getName()) * 4;
+                if (firstAddr.getTp().getDataType() == ValueType.DataType.Integer8Ty) {
+                    ptr = Integer.parseInt(bis2.getName());
+                }
+                if (ptr != 0) {
+                    currentFunction.addInstr(new MipsInstruction(ADDIU, ptrReg.getName(), ptrReg.getName(), String.valueOf(ptr)));
+                }
             } else {
-                VirtualRegister temp = getVirtualReg(bis2);
-                // 先乘4
-                currentFunction.addInstr(new MipsInstruction(SLL, temp.getName(), temp.getName(), String.valueOf(2)));
-                ptrReg = getVirtualReg(getElementPtr);
-                currentFunction.addInstr(new MipsInstruction(ADDIU, ptrReg.getName(), temp.getName(), String.valueOf(ptr)));
-                currentFunction.addInstr(new MipsInstruction(ADDU, ptrReg.getName(), first.getName(), ptrReg.getName()));
+                MipsRegister temp = getReg(bis2);
+                if (firstAddr.getTp().getDataType() == ValueType.DataType.Integer32Ty) {
+                    currentFunction.addInstr(new MipsInstruction(SLL, "$v1", temp.getName(), String.valueOf(2)));
+                    currentFunction.addInstr(new MipsInstruction(ADDU, ptrReg.getName(), ptrReg.getName(), "$v1"));
+                } else {
+                    currentFunction.addInstr(new MipsInstruction(ADDU, ptrReg.getName(), ptrReg.getName(), temp.getName()));
+                }
+
             }
-        } else {
-            ptrReg = getVirtualReg(getElementPtr);
-            currentFunction.addInstr(new MipsInstruction(ADDIU, ptrReg.getName(), first.getName(), String.valueOf(ptr)));
         }
+        saveInStack(getElementPtr, ptrReg);
     }
 
     public void genCompare(Compare compare) {
@@ -521,36 +598,34 @@ public class Translator {
             if (user instanceof Zext) { // 说明参与运算，需要分配寄存器
                 Value value1 = compare.getOperands().get(0);
                 Value value2 = compare.getOperands().get(1);
-                VirtualRegister temp = getVirtualReg(user);
-                VirtualRegister op1;
-                VirtualRegister op2;
+                MipsRegister temp = getReg(compare);
+                MipsRegister op1;
+                MipsRegister op2;
                 if (value1 instanceof Constant) {
-                    if (value1.getName().equals("0")) {
-                        op1 = VirtualRegister.vZero;
-                    } else {
-                        op1 = getVirtualReg(value1);
+                    op1 = getReg(value1);
+                    if (!value1.getName().equals("0")) {
                         currentFunction.addInstr(new MipsInstruction(LI, op1.getName(), value1.getName()));
                     }
                 } else {
-                    op1 = getVirtualReg(value1);
+                    op1 = getReg(value1);
                 }
                 if (value2 instanceof Constant) {
-                    if (value2.getName().equals("0")) {
-                        op2 = VirtualRegister.vZero;
-                    } else {
-                        op2 = getVirtualReg(value2);
+                    op2 = getReg(value2);
+                    if (!value2.getName().equals("0")) {
                         currentFunction.addInstr(new MipsInstruction(LI, op2.getName(), value2.getName()));
                     }
                 } else {
-                    op2 = getVirtualReg(value2);
+                    op2 = getReg(value2);
                 }
-                genIcmpInstr(compare.getCondType(), temp, op1, op2);
+                genIcmpInstr(compare, temp, op1, op2);
+                break;
             }
         }
     }
 
-    public void genIcmpInstr(Compare.CondType type, VirtualRegister temp, VirtualRegister op1, VirtualRegister op2) {
+    public void genIcmpInstr(Compare instr, MipsRegister temp, MipsRegister op1, MipsRegister op2) {
         MipsInstruction compare;
+        Compare.CondType type = instr.getCondType();
         switch (type) {
             case NE:
                 compare = new MipsInstruction(SNE, temp.getName(), op1.getName(), op2.getName());
@@ -559,12 +634,12 @@ public class Translator {
                 compare = new MipsInstruction(SEQ, temp.getName(), op1.getName(), op2.getName());
                 break;
             case SGE:   // >= 就是 < 再取反
-                currentFunction.addInstr(new MipsInstruction(SLT, temp.getName(), op1.getName(), op2.getName()));
-                compare = new MipsInstruction(SEQ, temp.getName(), temp.getName(), "$zero");
+                currentFunction.addInstr(new MipsInstruction(SLT, "$v1", op1.getName(), op2.getName()));
+                compare = new MipsInstruction(SEQ, temp.getName(), "$v1", "$zero");
                 break;
             case SLE:   // <= 就是 > 再取反
-                currentFunction.addInstr(new MipsInstruction(SLT, temp.getName(), op2.getName(), op1.getName()));
-                compare = new MipsInstruction(SEQ, temp.getName(), temp.getName(), "$zero");
+                currentFunction.addInstr(new MipsInstruction(SLT, "$v1", op2.getName(), op1.getName()));
+                compare = new MipsInstruction(SEQ, temp.getName(), "$v1", "$zero");
                 break;
             case SGT:   // > 就是交换操作数的 <
                 compare = new MipsInstruction(SLT, temp.getName(), op2.getName(), op1.getName());
@@ -576,25 +651,151 @@ public class Translator {
                 compare = new MipsInstruction(NOP);
         }
         currentFunction.addInstr(compare);
+        saveInStack(instr, temp);
     }
+
+    public void genBranch(Branch branch) {
+        currentFunction.addInstr(new MipsInstruction("# " + branch));
+        if (branch.getOperands().size() == 1) { // 直接跳转
+            currentFunction.addInstr(new MipsInstruction(J, ((BasicBlock) branch.getOperands().get(0)).getLabel()));
+            currentFunction.addInstr(new MipsInstruction(NOP));
+            return;
+        }
+        Value cond = branch.getOperands().get(0);
+        if (cond instanceof Constant) {
+            if (cond.getName().equals("0")) {
+                currentFunction.addInstr(new MipsInstruction(J, ((BasicBlock) branch.getOperands().get(2)).getLabel()));
+            } else {
+                currentFunction.addInstr(new MipsInstruction(J, ((BasicBlock) branch.getOperands().get(1)).getLabel()));
+            }
+            currentFunction.addInstr(new MipsInstruction(NOP));
+            return;
+        }
+        Compare judge = (Compare) branch.getOperands().get(0);
+        BasicBlock trueBranch = (BasicBlock) branch.getOperands().get(1);
+        BasicBlock falseBranch = (BasicBlock) branch.getOperands().get(2);
+        if (curBlock.getNeighbour().getName().equals(falseBranch.getName())) {  // 直接后继是trueBranch
+            genBranchInstr(judge, trueBranch);
+        } else {
+            Compare compare = reverseIcmp(judge);
+            genBranchInstr(compare, falseBranch);
+        }
+    }
+
+    public void genBranchInstr(Compare judge, BasicBlock target) {
+        Value value1 = judge.getOperands().get(0);
+        Value value2 = judge.getOperands().get(1);
+        MipsRegister op1 = getReg(value1);
+        MipsRegister op2 = getReg(value2);
+        if (value1 instanceof Constant && !value1.getName().equals("0")) {
+            currentFunction.addInstr(new MipsInstruction(LI, op1.getName(), value1.getName()));
+        }
+        if (value2 instanceof Constant && !value2.getName().equals("0")) {
+            currentFunction.addInstr(new MipsInstruction(LI, op2.getName(), value2.getName()));
+        }
+        MipsInstruction branch;
+        switch (judge.getCondType()) {
+            case NE:
+                branch = new MipsInstruction(BNE, op1.getName(), op2.getName(), target.getLabel());
+                break;
+            case EQ:
+                branch = new MipsInstruction(BEQ, op1.getName(), op2.getName(), target.getLabel());
+                break;
+            case SGE:
+                branch = new MipsInstruction(BGE, op1.getName(), op2.getName(), target.getLabel());
+                break;
+            case SLE:
+                branch = new MipsInstruction(BLE, op1.getName(), op2.getName(), target.getLabel());
+                break;
+            case SGT:
+                branch = new MipsInstruction(BGT, op1.getName(), op2.getName(), target.getLabel());
+                break;
+            case SLT:
+                branch = new MipsInstruction(BLT, op1.getName(), op2.getName(), target.getLabel());
+                break;
+            default:
+                branch = new MipsInstruction(NOP);
+        }
+        currentFunction.addInstr(branch);
+        currentFunction.addInstr(new MipsInstruction(NOP));
+    }
+
+    public Compare reverseIcmp(Compare compare) {
+        switch (compare.getCondType()) {
+            case NE:
+                compare.setCondType(Compare.CondType.EQ);
+                break;
+            case EQ:
+                compare.setCondType(Compare.CondType.NE);
+                break;
+            case SGE:
+                compare.setCondType(Compare.CondType.SLT);
+                break;
+            case SLE:
+                compare.setCondType(Compare.CondType.SGT);
+                break;
+            case SGT:
+                compare.setCondType(Compare.CondType.SLE);
+                break;
+            case SLT:
+                compare.setCondType(Compare.CondType.SGE);
+                break;
+            default:
+                break;
+        }
+        return compare;
+    }
+
+    private boolean flag = true;
 
     /**
      * value可能是变量，也有可能是常量
      * @param value llvm中的Value
      * @return 虚拟寄存器
      */
-    private VirtualRegister getVirtualReg(Value value) {
-        if (value2virtualMap.containsKey(value)) {
-            return value2virtualMap.get(value);
+    private MipsRegister getReg(Value value) {
+        HashMap<Value, Integer> value2reg = irFunction.getGlobalRegsMap();
+        HashSet<Value> value2Stack = irFunction.getValueInStack();
+        if (value2reg.containsKey(value)) {
+            int reg = value2reg.get(value);
+            return regManager.getReg(reg);
+        } else if (value2Stack.contains(value)) {
+            int ptr = stackManager.getVirtualPtr(value.getFullName());
+            if (flag) {
+                currentFunction.addInstr(new MipsInstruction(LW, "$t8", "$sp", String.valueOf(ptr)));
+                flag = false;
+                return regManager.getReg(16);
+            } else {
+                currentFunction.addInstr(new MipsInstruction(LW, "$t9", "$sp", String.valueOf(ptr)));
+                flag = true;
+                return regManager.getReg(17);
+            }
+        } else {    // 临时常量等
+            if (value instanceof Constant && value.getName().equals("0")) {
+                return regManager.getReg(0);
+            }
+            if (flag) {
+                flag = false;
+                return regManager.getReg(16);
+            }
+            flag = true;
+            return regManager.getReg(17);
         }
-        VirtualRegister reg = new VirtualRegister(value.getId() + value.getName());
-        value2virtualMap.put(value, reg);
-        return reg;
+    }
+
+    public void saveInStack(Value value, MipsRegister temp) {
+        if (!irFunction.getGlobalRegsMap().containsKey(value) || irFunction.getValueInStack().contains(value)) {
+            int ptr = stackManager.getVirtualPtr(value.getFullName());
+            currentFunction.addInstr(new MipsInstruction(SW, temp.getName(), "$sp", String.valueOf(ptr)));
+        }
     }
 
     public String getDataType(ValueType.DataType dataType, boolean isString) {
         if (isString) {
             return ".asciiz";
+        }
+        if (dataType == ValueType.DataType.Integer8Ty) {
+            return ".byte";
         }
         return ".word";
     }

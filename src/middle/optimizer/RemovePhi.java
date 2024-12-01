@@ -8,6 +8,7 @@ import llvmir.values.instr.*;
 import utils.SlotTracker;
 
 import java.util.ArrayList;
+import java.util.Map;
 
 public class RemovePhi {
     private Module module;
@@ -19,6 +20,16 @@ public class RemovePhi {
     public void removePhi() {
         phi2pc();
         pc2Move();
+        module.setVirtualName();
+        for (Function function: module.getFunctions()) {
+            System.out.println("\n" + function.getName() + ": \n");
+            for (Map.Entry<Value, Integer> entry : function.getGlobalRegsMap().entrySet()) {
+                System.out.println(entry.getKey().getFullName() + ": " + entry.getValue());
+            }
+            for (Value value : function.getValueInStack()) {
+                System.out.println(value.getFullName() + ": in stack");
+            }
+        }
     }
 
     private void phi2pc() {
@@ -47,7 +58,7 @@ public class RemovePhi {
             for (BasicBlock pre: pres) {
                 Pc pc = new Pc();
                 if (pre.getSubsequents().size() > 1) {
-                    BasicBlock insert = new BasicBlock(SlotTracker.slot(), function);
+                    BasicBlock insert = new BasicBlock("", function);
                     insertBetween(pre, insert, basicBlock);
                     if (basicBlock.equals(pre.getNeighbour())) {
                         function.insertBlock(pre, insert);
@@ -73,6 +84,7 @@ public class RemovePhi {
                     pcs.get(i).addOperands(phi, phi.getOperands().get(i));
                 }
                 basicBlock.getInstructions().remove(phi);
+                phi.setNeedName(true);  // 方便输出消除phi后的中间代码
             }
         }
     }
@@ -112,7 +124,7 @@ public class RemovePhi {
                             if (pc.getDst().get(i).equals(pc.getSrc().get(i))) {
                                 continue;
                             }
-                            Value value = new Value(pc.getDst().get(i).getTp(), SlotTracker.slot());
+                            Value value = new Value(pc.getDst().get(i).getTp(), "");
                             Move move = new Move(value, pc.getSrc().get(i), block);
                             block.insertBeforeTerminator(move);
                             pc.getSrc().set(i, value);

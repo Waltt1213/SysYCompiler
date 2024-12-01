@@ -1,5 +1,7 @@
 package llvmir;
 
+import utils.SlotTracker;
+
 import java.util.ArrayList;
 import java.util.Objects;
 
@@ -74,6 +76,10 @@ public class Value {
 
     public Value def() {
         return this;
+    }
+
+    public void setVirtualName() {
+        setName(SlotTracker.slot());
     }
 
     @Override

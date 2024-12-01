@@ -3,7 +3,7 @@ package llvmir.values.instr;
 import llvmir.ValueType;
 
 public class Compare extends Instruction {
-    private final CondType condType;
+    private CondType condType;
 
     public Compare(String name, CondType type) {
         super(new ValueType.Type(ValueType.DataType.Integer1Ty), Type.ICMP, name);
@@ -12,6 +12,10 @@ public class Compare extends Instruction {
 
     public CondType getCondType() {
         return condType;
+    }
+
+    public void setCondType(CondType condType) {
+        this.condType = condType;
     }
 
     public enum CondType {

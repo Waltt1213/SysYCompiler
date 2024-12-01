@@ -19,4 +19,12 @@ public class MipsModule {
     public void addFunction(MipsFunction function) {
         textSegment.add(function);
     }
+
+    public ArrayList<MipsData> getDataSegment() {
+        return dataSegment;
+    }
+
+    public ArrayList<MipsFunction> getTextSegment() {
+        return textSegment;
+    }
 }

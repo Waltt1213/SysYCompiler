@@ -3,8 +3,8 @@ package backend.mips;
 import java.util.ArrayList;
 
 public class MipsFunction {
-    private String name;
-    private ArrayList<MipsInstruction> instructions;
+    private final String name;
+    private final ArrayList<MipsInstruction> instructions;
 
     public MipsFunction(String name) {
         this.name = name;
@@ -15,4 +15,11 @@ public class MipsFunction {
         instructions.add(instruction);
     }
 
+    public String getName() {
+        return name;
+    }
+
+    public ArrayList<MipsInstruction> getInstructions() {
+        return instructions;
+    }
 }

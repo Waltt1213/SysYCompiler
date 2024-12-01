@@ -1,7 +1,9 @@
 package utils;
 
 import backend.mips.MipsData;
+import backend.mips.MipsFunction;
 import backend.mips.MipsInstruction;
+import backend.mips.MipsModule;
 import frontend.Error;
 import frontend.Token;
 import frontend.TokenType;
@@ -24,7 +26,8 @@ public class FileIO {
     public static final String optimizeFilePath = String.valueOf(Paths.get("optimize_ir.txt"));
     public static final String NoOptimizeIrFilePath = String.valueOf(Paths.get("testfilei22371103王鹏_优化前中间代码.txt"));
     public static final String OptimizeIrFilePath = String.valueOf(Paths.get("testfilei22371103王鹏_优化后中间代码.txt"));
-    private static final String mipsFilePath = String.valueOf(Paths.get("mips.txt"));
+    public static final String mipsFilePath = String.valueOf(Paths.get("mips.txt"));
+    public static final String NoOptMipsFilePath = String.valueOf(Paths.get("mips_noopt.txt"));
 
     public static String readTestFile() throws IOException {
         FileReader fr = new FileReader(testFilePath);
@@ -114,6 +117,28 @@ public class FileIO {
         }
         for (MipsInstruction instruction: textSegment) {
             bw.write(instruction.toString() + "\n");
+        }
+        bw.close();
+        fw.close();
+    }
+
+    public static void printMipsCode(MipsModule module) throws IOException {
+        FileWriter fw = new FileWriter(mipsFilePath);
+        BufferedWriter bw = new BufferedWriter(fw);
+        if (!module.getDataSegment().isEmpty()) {
+            bw.write(".data\n");
+        }
+        for (MipsData dataSeg: module.getDataSegment()) {
+            bw.write(dataSeg.toString() + "\n");
+        }
+        if (!module.getTextSegment().isEmpty()) {
+            bw.write(".text\n");
+        }
+        for (MipsFunction function: module.getTextSegment()) {
+            bw.write(function.getName() + ": \n");
+            for (MipsInstruction instruction : function.getInstructions()) {
+                bw.write(instruction.toString() + "\n");
+            }
         }
         bw.close();
         fw.close();

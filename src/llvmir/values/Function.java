@@ -6,6 +6,8 @@ import llvmir.values.instr.Return;
 import utils.SlotTracker;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 
 public class Function extends Value {
     private ArrayList<Argument> funcFParams;
@@ -13,6 +15,8 @@ public class Function extends Value {
     private final boolean isDefine;
     private boolean isNotVoid;
     private boolean isReturn;
+    private HashMap<Value, Integer> globalRegsMap;
+    private HashSet<Value> valueInStack;
 
     public Function(ValueType.Type vt, String name,
                     boolean isDefine) {
@@ -76,6 +80,10 @@ public class Function extends Value {
         return isNotVoid;
     }
 
+    public boolean isDefine() {
+        return isDefine;
+    }
+
     public ArrayList<Argument> getFuncFParams() {
         return funcFParams;
     }
@@ -110,6 +118,22 @@ public class Function extends Value {
             basicBlock.setNeedName(false);
             basicBlock.setVirtualName();
         }
+    }
+
+    public void setGlobalRegsMap(HashMap<Value, Integer> globalRegsMap) {
+        this.globalRegsMap = globalRegsMap;
+    }
+
+    public HashMap<Value, Integer> getGlobalRegsMap() {
+        return globalRegsMap;
+    }
+
+    public HashSet<Value> getValueInStack() {
+        return valueInStack;
+    }
+
+    public void setValueInStack(HashSet<Value> valueInStack) {
+        this.valueInStack = valueInStack;
     }
 
     @Override

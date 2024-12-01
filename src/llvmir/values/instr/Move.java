@@ -26,6 +26,11 @@ public class Move extends Instruction {
     }
 
     @Override
+    public void setVirtualName() {
+        dst.setVirtualName();
+    }
+
+    @Override
     public HashSet<Value> use() {
         HashSet<Value> use = new HashSet<>();
         use.add(src);

@@ -1,5 +1,8 @@
 package backend.mips;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class MipsRegister {
     public static String[] RegName = {  // t8 t9的编号与mips原设计有出入
             "$zero", "$at", "$v0", "$v1", "$a0", "$a1", "$a2", "$a3",
@@ -19,6 +22,16 @@ public class MipsRegister {
                 this.no = i;
             }
         }
+    }
+
+    public static List<Integer> allocableRegs() {
+        List<Integer> regs = new ArrayList<>();
+        for (int i = 8; i < 26; i++) {
+            if (i != 16 && i != 17) {   // $t8 $t9 留下
+                regs.add(i);
+            }
+        }
+        return regs;
     }
 
     public MipsRegister(int i) {

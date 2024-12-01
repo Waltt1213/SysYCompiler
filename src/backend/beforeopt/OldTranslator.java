@@ -124,11 +124,7 @@ public class OldTranslator {
         allocArguments(function);
         // 记录save reg映射
         for (int i = 0; i < 10; i++) {
-            if (i < 10) {
-                stackManager.putVirtualReg("$t" + i, 4);
-            } else {
-                stackManager.putVirtualReg("$s" + (i - 10), 4);
-            }
+            stackManager.putVirtualReg("$t" + i, 4);
             size += 4;
         }
         // 保存local var: MIPS在保存局部变量时，遵循的顺序是：先定义的变量后入栈

@@ -1,7 +1,6 @@
 package llvmir.values.instr;
 
 import llvmir.Value;
-import llvmir.ValueType;
 import llvmir.values.BasicBlock;
 import llvmir.values.Constant;
 
@@ -9,7 +8,6 @@ import java.util.ArrayList;
 
 public class Phi extends Instruction {
     private ArrayList<BasicBlock> preBlocks = new ArrayList<>();
-    private boolean removed = false;
 
     public Phi(Value value, String name) {
         super(value.getTp().getInnerType(), Type.PHI, name);
@@ -29,16 +27,15 @@ public class Phi extends Instruction {
         }
     }
 
-    public void setRemoved(boolean removed) {
-        this.removed = removed;
+    @Override
+    public void setVirtualName() {
+        super.setVirtualName();
+        setNeedName(false);
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        if (removed) {
-            sb.append("; ");
-        }
         sb.append(getFullName()).append(" = phi ").append(tp.toString()).append(" ");
         for (int i = 0; i < preBlocks.size(); i++) {
             sb.append("[ ");
