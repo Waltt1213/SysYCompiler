@@ -1,4 +1,4 @@
-package backend.beforeopt;
+package backend.mips;
 
 import java.util.HashMap;
 import java.util.HashSet;

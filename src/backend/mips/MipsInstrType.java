@@ -4,7 +4,6 @@ public enum MipsInstrType {
     LI("li"),
     LA("la"),
     MOVE("move"),
-    ADDI("addi"),
     ADDU("addu"),
     ADDIU("addiu"),
     SUBI("subi"),

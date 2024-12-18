@@ -1,9 +1,6 @@
 package backend.beforeopt;
 
-import backend.mips.MipsData;
-import backend.mips.MipsInstrType;
-import backend.mips.MipsInstruction;
-import backend.mips.MipsRegister;
+import backend.mips.*;
 import llvmir.Module;
 import llvmir.Value;
 import llvmir.ValueType;

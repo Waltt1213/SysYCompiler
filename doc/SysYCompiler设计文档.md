@@ -36,12 +36,15 @@ PL/0编译器文件组织相对简单，主要包含以下几个部分：
 
 本编译器为SysY语言编译器，采用`Java`语言书写，主要包括词法分析、语法分析、语义分析和中间代码生成、代码优化、生成目标代码等五个部分。
 
-> 当前进度：语法分析
+> 当前进度：项目基本完成
 
 ### 总体结构
 
 * 词法分析阶段：从`testfile.txt`中读取源代码，将其字符转化为单词。
 * 语法分析阶段：将分析得到的单词流根据文法解析成抽象语法树。
+* 语义分析阶段：将抽象语法树翻译生产中间代码，包含错误处理。
+* 代码优化阶段：优化中间代码，如mem2reg，DCE，GVN-GCM等。
+* 目标代码生成阶段：将中间代码翻译成目标代码mips。
 
 ### 接口设计
 
@@ -50,69 +53,136 @@ PL/0编译器文件组织相对简单，主要包含以下几个部分：
 | sourceCode          | 以字符串形式存储的源代码                       |
 | lexer               | 词法分析器                                     |
 | parser              | 语法分析器                                     |
-| readTestFIle()      | 从特定路径中读取源代码.txt文件 (`utils.FileIO.java`) |
+| visitor             | 语义分析器                                     |
+| module              | LLVM IR的总体结构                              |
+| optimizer           | 优化器                                         |
+| Optimize            | 优化开关                                       |
+| translator          | 目标代码翻译器                                 |
+| readTestFIle()      | 从特定路径中读取源代码.txt文件 (`FileIO.java`) |
 | analyzeCode()       | 词法分析阶段入口 (`Lexer.java`)                |
 | analyzeTokens()     | 语法分析阶段入口(`Parser.java`)                |
-| printLexerResult()  | 词法分析结果输出 (`utils.FileIO.java`)               |
+| printLexerResult()  | 词法分析结果输出 (`FileIO.java`)               |
 | printParserResult() | 语法分析结果输出(`FIleIO.java`)                |
-| printError()        | 错误结果输出 (`utils.FileIO.java`)                   |
+| printError()        | 错误结果输出 (`FileIO.java`)                   |
+| buildIR()           | 语义分析并生成中间代码入口(`Visitor.java`)     |
+| printLlvmIrResult() | 中间代码结果输出(`FileIO.java`)                |
+| optimizeSSA()       | 中端优化启动(`Optimizer.java`)                 |
+| optimizeBackend()   | 后端优化启动(`Optimizer.java`)                 |
+| genMipsCode()       | 目标代码(Mips)生成入口(`Translator.java`)      |
+| printMipsCode()     | 目标代码结果输出(`FileIO.java`)                |
 
 ### 文件组织
 
 ```c
 SysYCompiler
-|-- error.txt
-|-- lexer.txt
-|-- parser.txt
 |-- src
 |   |-- Compiler.java
-|   |-- utils.FileIO.java
+|   |-- backend
+|   |   |-- afteropt
+|   |   |   `-- Translator.java
+|   |   |-- beforeopt
+|   |   |   |-- OldTranslator.java
+|   |   |   `-- RegManager.java
+|   |   `-- mips
+|   |       |-- MipsData.java
+|   |       |-- MipsFunction.java
+|   |       |-- MipsInstrType.java
+|   |       |-- MipsInstruction.java
+|   |       |-- MipsModule.java
+|   |       |-- MipsRegister.java
+|   |       `-- StackManager.java
 |   |-- config.json
-|   `-- frontend
-|       |-- Error.java
-|       |-- Lexer.java
-|       |-- Parser.java
-|       |-- Token.java
-|       |-- TokenType.java
-|       `-- ast
-|           |-- AddExp.java
-|           |-- AstNode.java
-|           |-- Block.java
-|           |-- Character.java
-|           |-- CompUnit.java
-|           |-- Cond.java
-|           |-- ConstDecl.java
-|           |-- ConstDef.java
-|           |-- ConstExp.java
-|           |-- ConstInitVal.java
-|           |-- EqExp.java
-|           |-- Exp.java
-|           |-- ForStmt.java
-|           |-- FuncDef.java
-|           |-- FuncFParam.java
-|           |-- FuncFParams.java
-|           |-- FuncRParams.java
-|           |-- FuncType.java
-|           |-- InitVal.java
-|           |-- LAndExp.java
-|           |-- LOrExp.java
-|           |-- LVal.java
-|           |-- MainFuncDef.java
-|           |-- MulExp.java
-|           |-- Number.java
-|           |-- PrimaryExp.java
-|           |-- RelExp.java
-|           |-- Stmt.java
-|           |-- UnaryExp.java
-|           |-- UnaryOp.java
-|           |-- VarDecl.java
-|           `-- VarDef.java
-`-- testfile.txt
+|   |-- frontend
+|   |   |-- Error.java
+|   |   |-- Lexer.java
+|   |   |-- Parser.java
+|   |   |-- Token.java
+|   |   |-- TokenType.java
+|   |   `-- ast
+|   |       |-- AddExp.java
+|   |       |-- AstNode.java
+|   |       |-- Block.java
+|   |       |-- Character.java
+|   |       |-- CompUnit.java
+|   |       |-- Cond.java
+|   |       |-- ConstDecl.java
+|   |       |-- ConstDef.java
+|   |       |-- ConstExp.java
+|   |       |-- ConstInitVal.java
+|   |       |-- EqExp.java
+|   |       |-- Exp.java
+|   |       |-- ForStmt.java
+|   |       |-- FuncDef.java
+|   |       |-- FuncFParam.java
+|   |       |-- FuncFParams.java
+|   |       |-- FuncRParams.java
+|   |       |-- FuncType.java
+|   |       |-- InitVal.java
+|   |       |-- LAndExp.java
+|   |       |-- LOrExp.java
+|   |       |-- LVal.java
+|   |       |-- MainFuncDef.java
+|   |       |-- MulExp.java
+|   |       |-- Number.java
+|   |       |-- PrimaryExp.java
+|   |       |-- RelExp.java
+|   |       |-- Stmt.java
+|   |       |-- UnaryExp.java
+|   |       |-- UnaryOp.java
+|   |       |-- VarDecl.java
+|   |       `-- VarDef.java
+|   |-- llvmir
+|   |   |-- Module.java
+|   |   |-- User.java
+|   |   |-- Value.java
+|   |   |-- ValueType.java
+|   |   `-- values
+|   |       |-- Argument.java
+|   |       |-- BasicBlock.java
+|   |       |-- Constant.java
+|   |       |-- Function.java
+|   |       |-- GlobalVariable.java
+|   |       `-- instr
+|   |           |-- Alloca.java
+|   |           |-- BinaryOperator.java
+|   |           |-- Branch.java
+|   |           |-- Call.java
+|   |           |-- Compare.java
+|   |           |-- GetElementPtr.java
+|   |           |-- Instruction.java
+|   |           |-- Load.java
+|   |           |-- Move.java
+|   |           |-- Pc.java
+|   |           |-- Phi.java
+|   |           |-- Return.java
+|   |           |-- Store.java
+|   |           |-- Trunc.java
+|   |           `-- Zext.java
+|   |-- middle
+|   |   |-- irbuilder
+|   |   |   |-- SymType.java
+|   |   |   |-- Symbol.java
+|   |   |   |-- SymbolTable.java
+|   |   |   `-- Visitor.java
+|   |   `-- optimizer
+|   |       |-- CFG.java
+|   |       |-- DCE.java
+|   |       |-- GCM.java
+|   |       |-- GVN.java
+|   |       |-- LiveAnalyze.java
+|   |       |-- Mem2reg.java
+|   |       |-- Optimizer.java
+|   |       |-- RegAlloc.java
+|   |       |-- RemovePhi.java
+|   |       `-- SimplifyBlock.java
+|   `-- utils
+|       |-- FileIO.java
+|       |-- SlotTracker.java
+|       `-- Transform.java
+|-- testfile.txt
 ```
 
 ##  02词法分析设计
-
-> 编码前设计
 
 ### 类别码定义(TokenType.java)
 
@@ -209,8 +279,6 @@ public Token next() {
 ```
 
 ## 03语法分析设计
-
-> 编码前设计
 
 ### 抽象语法树设计(ast软件包)
 
@@ -431,7 +499,273 @@ public class Error {
 
   ​						   k类错误，缺少右中括号。
 
+* 语义分析阶段：其他错误
+
 ## 05代码生成设计
 
+### 符号设计
+
+```java
+public class Symbol {
+    private final String name;
+    private final SymType type;
+    private Value value;	// 对应一个LLVM的Value
+    private final int depth;
+    private final int lineno;
+    private FuncFParams funcFParams;
+```
+
+其中SymType表示数据类型（int/char）和变量类型（array/const/function）,depth是所在符号表的深度。
+
+### 符号表设计
+
+```java
+public class SymbolTable {
+    private final LinkedHashMap<String, Symbol> symItems;
+    private SymbolTable fatherTable;
+    private final ArrayList<SymbolTable> children;
+    private final int depth;
+```
+
+用一张哈希表存储符合表的表项（即符号Symbol），同时维护一个树状符号表结构。
+
+### 符号表查询
+
+先在当前表中查询，如果查找不到，则向上查找符号表树的父结点表。
+
+```java
+public Symbol findSym(String name, String type) {
+    if (symItems.containsKey(name)) {
+        Symbol symbol = symItems.get(name);
+        if (symbol.getName().equals(name) && symbol.getVarOrFunc().equals(type)) {
+            return symbol;
+        }
+    }
+    if (fatherTable != null) {
+        return fatherTable.findSym(name, type);
+    }
+    return null;
+}
+```
+
+### 中间代码生成
+
+#### LLVM设计
+
+中间代码我采用的LLVM IR，构建了定义-使用的关系
+
+简单来说，基本类是Value，User类继承Value类，可以“使用”其他Value。Value中构建一个成员usersList，用来保存所有被使用的value；User中构建一个成员operands，用来保存使用的所有Value。这样，一个User能通过operands知道自己使用了哪些Value，一个Value也能通过usersList知道自己被哪些User所使用。这样的结构省去了Use这样的结构，更简洁更清晰。定义-使用关系的构建发生在User添加一个Value作为操作数时：
+
+```java
+public void addOperands(Value value) {
+    operands.add(value); // 使用这个value作为操作数
+    if (value != null) {
+        value.addUser(this); // value被自己使用
+    }
+}
+```
+
+除此之外我还定义了Argument(参数)，BasicBlock(基本块)，Constant(常数)，Function(函数)，GlobalVariable(全局变量)，Instruction(指令)。其中指令继承User，其他继承自value。
+
+Instruction又分为一些LLVM的指令，全部继承自Instruction。
+
+![image-20241218203208383](SysYCompiler设计文档.assets/image-20241218203208383.png)
+
+#### 语义分析 生成中间代码
+
+visitor类用于完成语义分析并生成中间代码，其逻辑与递归下降类似。
+
+主要分为两个核心功能：构建符号表，生成中间代码。构建符号表的逻辑是每当进入一个Block时，就新建一张符号表，并将符号表添加进符号表树。
+
+生成中间代码的细节比较复杂，无法一一详细讲述，比较有意思的设计点是我在生成中间代码的时候就实现了部分常量传播和常量折叠。
+
+例如在生成加减乘除和取余的中间代码时：
+
+```java
+public Value getBinInstr(Value value1, Value value2, Type type) {
+    if (value1 == null || value2 == null) {
+        return null;
+    }
+    if (value1 instanceof Constant && value2 instanceof Constant) {
+        return calConst((Constant) value1, (Constant) value2, type);
+    } else {
+        Value zextValue1 = zext(value1);
+        Value zextValue2 = zext(value2);
+        BinaryOperator binOp = new BinaryOperator(
+            new ValueType.Type(Integer32Ty), type, "");
+        binOp.addOperands(zextValue1);
+        binOp.addOperands(zextValue2);
+        curBasicBlock.appendInstr(binOp, true);
+        return binOp;
+    }
+}
+
+public Constant calConst(Constant value1, Constant value2, Type type) {
+    switch (type) {
+        case ADD:
+            return new Constant(Integer.toString(Integer.parseInt(value1.getName())
+                                                 + Integer.parseInt(value2.getName())));
+        case SUB:
+            return new Constant(Integer.toString(Integer.parseInt(value1.getName())
+                                                 - Integer.parseInt(value2.getName())));
+        case MUL:
+            return new Constant(Integer.toString(Integer.parseInt(value1.getName())
+                                                 * Integer.parseInt(value2.getName())));
+        case SDIV:
+            return new Constant(Integer.toString(Integer.parseInt(value1.getName())
+                                                 / Integer.parseInt(value2.getName())));
+        case SREM:
+            return new Constant(Integer.toString(Integer.parseInt(value1.getName())
+                                                 % Integer.parseInt(value2.getName())));
+        default:
+            return null;
+    }
+}
+```
+
+### 目标代码生成
+
+#### 优化前设计
+
+在实现优化之前，我设计的中间代码到mips时内存-寄存器的翻译模式映射的。由于我的中间代码设计几乎保证了每个Value只被使用一次，因此我的寄存器分配策略采取的是最简单的寄存器池分配，即
+
+* 如果寄存器池不空，则分配一个临时寄存器。
+* 如果该Value被使用过一次，则当即释放寄存器。
+* 如果寄存器池已空，选择一个已分配寄存器的变量v，把v放回栈上，v释放的寄存器分配给其他变量。
+
+运行栈的设计是借鉴了mips的标准运行栈，我的设计如下：
+
+```java
+/**
+ * ra 
+ * fp 
+ * local variables(局部变量) 
+ * save register
+ * arguments
+ */
+private StackManager() {
+    stackPtr = 0;	// 栈指针
+    stackFrameMap = new HashMap<>();	// 维护变量名->栈内偏移量关系
+}
+```
+
+翻译mips的过程中，每进入一个函数，就开辟一段栈空间设置为函数的栈帧，这段栈帧从高地址到低地址依次为ra寄存器值，fp寄存器值（存放调用者的sp），需要保存的局部变量，需要保存的寄存器，以及**传递给子函数**的函数参数。**注意**在我设计的栈帧中，arguments并不是该函数的参数，而是用于传递给子函数参数而开辟的空间。**那函数自身参数存储在哪里呢？**只需要访问**调用者**的函数栈帧的arguements段即可（其中前四个参数直接访问\$a0-\$a3即可）。
+
+之前提到的寄存器不够时，要随机选择一个寄存器将旧值放到栈上，然后释放这个寄存器给新的变量使用。那么如果真的在翻译过程中出现这种情况，一定是需要移动sp指针的。而如果函数的sp默认指向arguments的最低地址，那么此时如果向下移动了sp，那么函数传参的偏移量位置就会出错，子函数从本来应该是argument的地址获得的却是被保存在栈上的临时变量。因此我的做法是**将sp指针指向arguments最高地址上方**，即传递参数给子函数时，永远是访问sp指针以下的区域。
+
+![stack](SysYCompiler设计文档.assets/stack.png)
+
+遇到函数调用时(call)，先保存现场，将尚未被释放的寄存器存入栈中对应位置，接着传递函数参数，前四个直接move到\$a0-\$a3，其他放入栈帧中arguments段，然后跳转到函数即可。从函数返回后要恢复现场，并获取返回值（默认保存在\$v0）。
+
+其他mips代码的翻译采取逐行对应翻译，唯一特殊的是跳转指令的翻译设计。对于条件跳转来说，往往br的上一条是一个icmp指令，如果逐句翻译那最少需要两条mips指令；我的选择是不单独翻译icmp，而是结合br一起翻译成一条mips是跳转指令。
+
+```java
+public void genBranchInstr(Compare judge, BasicBlock target) {
+    Value value1 = judge.getOperands().get(0);
+    Value value2 = judge.getOperands().get(1);
+    MipsRegister op1 = getReg(value1);
+    MipsRegister op2 = getReg(value2);
+    MipsInstruction branch;
+    switch (judge.getCondType()) {
+        case NE:
+            branch = new MipsInstruction(
+                BNE, op1.getName(), op2.getName(), target.getLabel());
+            break;
+        case EQ:
+            branch = new MipsInstruction(
+                BEQ, op1.getName(), op2.getName(), target.getLabel());
+            break;
+        case SGE:
+            branch = new MipsInstruction(
+                BGE, op1.getName(), op2.getName(), target.getLabel());
+            break;
+        case SLE:
+            branch = new MipsInstruction(
+                BLE, op1.getName(), op2.getName(), target.getLabel());
+            break;
+        case SGT:
+            branch = new MipsInstruction(
+                BGT, op1.getName(), op2.getName(), target.getLabel());
+            break;
+        case SLT:
+            branch = new MipsInstruction(
+                BLT, op1.getName(), op2.getName(), target.getLabel());
+            break;
+        default:
+            branch = new MipsInstruction(NOP);
+    }
+    currentFunction.addInstr(branch);
+}
+```
+
+#### 优化后设计
+
+优化后的寄存器分配采用了线性扫描的寄存器分配办法，完成活跃变量分析后，设置一个寄存器池。从函数的入口基本块开始，遍历每条IR指令对应的变量：
+
+* 初始化一个集合，包含IR指令的使用和定义（对于llvm来说，类似store, br等都是不含有变量定义，只含有变量使用的）
+* 对集合中每个变量都尝试分配寄存器：如果尚未被分配过且寄存器池还有剩余，那么就分配一个寄存器；如果寄存器池已经空了，则将该变量标记为放入**内存**上。如果已经被分配了，则检查该基本块后续是否还用到该变量或者该变量是否跨基本块活跃，若不是则可以释放掉寄存器。
+
+```java
+// 已经分配寄存器,检查是否可以释放
+if (value2reg.containsKey(value)) {
+    if (canFree(value)) {
+        int reg = value2reg.get(value);
+        removed.add(reg);
+    }
+    return;
+}
+// 分配寄存器
+if (!freeRegsPool.isEmpty()) {  // 如果寄存器池不为空则直接分配
+    int reg = freeRegsPool.remove(0);
+    value2reg.put(value, reg);
+    reg2Value.put(reg, value);
+} else {    // 无法分配寄存器，需要放到栈上
+    value2Stack.add(value);
+}
+```
+
+* 释放寄存器逻辑：
+
+```java
+private boolean canFree(Value value) {
+    if (currentBlock.getOuts().contains(value)) {	// 跨基本块活跃，不能释放
+        return false;
+    }
+    // 检查该基本块的后续指令，instrPos指向的是当前指令
+    for (int i = instrPos + 1; i < currentBlock.getInstructions().size(); i++) {
+        if (currentBlock.getInstructions().get(i).use().contains(value)
+            || value.equals(currentBlock.getInstructions().get(i).def())) {
+            return false;
+        }
+    }
+    return true;
+}
+```
+
+具体细节可查看优化文档。
+
 ## 06代码优化设计
+
+我实现的优化主要包括mem2reg（包括必要的消除Phi），死代码删除（DCE）,GVN-GCM，线性扫描寄存器分配。具体实现可查看优化文档。
+
+优化分为两步，第一步是中端优化，第二步是后端优化。
+
+```java
+public void optimizeSSA() {
+    simplifyBlock.removeDeadBlocks();
+    cfg.buildCFG();     // 构建CFG
+    mem2reg.buildSSA(); // 实现SSA
+    dce.dce();          // 删除死代码
+    cfg.buildCFG();
+    gvn.gvn();          // GVN
+    gcm.gcm();			// GCM
+}
+
+public void optimizeBackend() {
+    activeAnalyze.analyzeActiveVar();   // 活跃变量分析
+    regAlloc.regAlloc();                // 线性扫描分配寄存器
+    removePhi.removePhi();              // 消除phi
+    genNeighbour();
+}
+```
 

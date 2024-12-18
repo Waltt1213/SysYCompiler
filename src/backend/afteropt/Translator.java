@@ -2,7 +2,7 @@ package backend.afteropt;
 
 import backend.beforeopt.RegManager;
 import backend.mips.*;
-import backend.beforeopt.StackManager;
+import backend.mips.StackManager;
 import llvmir.Module;
 import llvmir.Value;
 import llvmir.ValueType;
@@ -335,7 +335,7 @@ public class Translator {
             currentFunction.addInstr(new MipsInstruction(SYSCALL));
         } else {
             currentFunction.addInstr(new MipsInstruction(JR, "$ra"));
-            currentFunction.addInstr(new MipsInstruction(NOP));
+            // currentFunction.addInstr(new MipsInstruction(NOP));
         }
     }
 
@@ -379,7 +379,7 @@ public class Translator {
         }
         // 跳转到目标函数
         currentFunction.addInstr(new MipsInstruction(JAL, function.getName()));
-        currentFunction.addInstr(new MipsInstruction(NOP));
+        // currentFunction.addInstr(new MipsInstruction(NOP));
         // 恢复现场
         for (Integer reg: unused.keySet()) {
             MipsRegister temp = regManager.getReg(reg);
@@ -657,8 +657,11 @@ public class Translator {
     public void genBranch(Branch branch) {
         currentFunction.addInstr(new MipsInstruction("# " + branch));
         if (branch.getOperands().size() == 1) { // 直接跳转
+            if (curBlock.getNeighbour() != null && curBlock.getNeighbour().equals(branch.getOperands().get(0))) {
+                return;
+            }
             currentFunction.addInstr(new MipsInstruction(J, ((BasicBlock) branch.getOperands().get(0)).getLabel()));
-            currentFunction.addInstr(new MipsInstruction(NOP));
+            // currentFunction.addInstr(new MipsInstruction(NOP));
             return;
         }
         Value cond = branch.getOperands().get(0);
@@ -668,7 +671,7 @@ public class Translator {
             } else {
                 currentFunction.addInstr(new MipsInstruction(J, ((BasicBlock) branch.getOperands().get(1)).getLabel()));
             }
-            currentFunction.addInstr(new MipsInstruction(NOP));
+            // currentFunction.addInstr(new MipsInstruction(NOP));
             return;
         }
         Compare judge = (Compare) branch.getOperands().get(0);
@@ -718,7 +721,7 @@ public class Translator {
                 branch = new MipsInstruction(NOP);
         }
         currentFunction.addInstr(branch);
-        currentFunction.addInstr(new MipsInstruction(NOP));
+        // currentFunction.addInstr(new MipsInstruction(NOP));
     }
 
     public Compare reverseIcmp(Compare compare) {

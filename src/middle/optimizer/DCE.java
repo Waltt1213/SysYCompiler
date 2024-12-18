@@ -8,13 +8,11 @@ import llvmir.values.Function;
 import llvmir.values.GlobalVariable;
 import llvmir.values.instr.*;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
+import java.util.*;
 
 public class DCE {
-    private Module module;
-    private HashSet<Instruction> useful;
+    private final Module module;
+    private final HashSet<Instruction> useful;
 
     public DCE(Module module) {
         this.module = module;
@@ -22,7 +20,28 @@ public class DCE {
     }
 
     public void dce() {
+        // analysisDeadCode();
         delDeadCode();
+        // functionInline();
+    }
+
+    private void analysisDeadCode() {
+        for (Function function: module.getFunctions()) {
+            for (BasicBlock basicBlock: function.getBasicBlocks()) {
+                for (Instruction instruction: basicBlock.getInstructions()) {
+                    if (instruction instanceof Store) {
+                        function.setNoSideEffect(false);
+                    }
+                    if (instruction instanceof Call) {
+                        Function callFunc = ((Call) instruction).getCallFunc();
+                        if (!callFunc.isNoSideEffect()) {   // 有副作用
+                            function.setNoSideEffect(false);
+                        }
+                        function.addChild(((Call) instruction));
+                    }
+                }
+            }
+        }
     }
 
     public void delDeadCode() {
@@ -52,6 +71,12 @@ public class DCE {
                         continue;
                     }
                     iterator.remove();
+                    for (Value operand: instruction.use()) {
+                        if (operand instanceof Instruction) {
+                            Instruction o = (Instruction) operand;
+                            o.removeUser(instruction);
+                        }
+                    }
                 }
             }
         }

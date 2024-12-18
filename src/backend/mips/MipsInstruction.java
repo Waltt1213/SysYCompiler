@@ -1,5 +1,7 @@
 package backend.mips;
 
+import java.util.ArrayList;
+
 public class MipsInstruction {
     private String operand1;
     private String operand2;
@@ -39,6 +41,24 @@ public class MipsInstruction {
     public MipsInstruction(MipsInstrType op) {
         this.op = op;
         this.operandNum = 0;
+    }
+
+    public MipsInstrType getOp() {
+        return op;
+    }
+
+    public ArrayList<String> getOperands() {
+        ArrayList<String> operands = new ArrayList<>();
+        if (operand1 != null) {
+            operands.add(operand1);
+        }
+        if (operand2 != null) {
+            operands.add(operand2);
+        }
+        if (operand3 != null) {
+            operands.add(operand3);
+        }
+        return operands;
     }
 
     @Override

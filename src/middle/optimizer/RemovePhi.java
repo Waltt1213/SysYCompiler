@@ -20,15 +20,6 @@ public class RemovePhi {
         phi2pc();
         pc2Move();
         module.setVirtualName();
-        for (Function function: module.getFunctions()) {
-            System.out.println("\n" + function.getName() + ": \n");
-            for (Map.Entry<Value, Integer> entry : function.getGlobalRegsMap().entrySet()) {
-                System.out.println(entry.getKey().getFullName() + ": " + entry.getValue());
-            }
-            for (Value value : function.getValueInStack()) {
-                System.out.println(value.getFullName() + ": in stack");
-            }
-        }
     }
 
     private void phi2pc() {
@@ -154,6 +145,18 @@ public class RemovePhi {
         branch.addOperands(next);
         insert.setTerminator(branch);
         insert.setLabeled(true);
+    }
+
+    private void output() {
+        for (Function function: module.getFunctions()) {
+            System.out.println("\n" + function.getName() + ": \n");
+            for (Map.Entry<Value, Integer> entry : function.getGlobalRegsMap().entrySet()) {
+                System.out.println(entry.getKey().getFullName() + ": " + entry.getValue());
+            }
+            for (Value value : function.getValueInStack()) {
+                System.out.println(value.getFullName() + ": in stack");
+            }
+        }
     }
 
 }

@@ -2,6 +2,7 @@ package llvmir.values;
 
 import llvmir.Value;
 import llvmir.ValueType;
+import llvmir.values.instr.Call;
 import llvmir.values.instr.Return;
 import utils.SlotTracker;
 
@@ -17,6 +18,8 @@ public class Function extends Value {
     private boolean isReturn;
     private HashMap<Value, Integer> globalRegsMap;
     private HashSet<Value> valueInStack;
+    private boolean noSideEffect = true;
+    private final HashSet<Call> callers = new HashSet<>();
 
     public Function(ValueType.Type vt, String name,
                     boolean isDefine) {
@@ -105,6 +108,22 @@ public class Function extends Value {
         isReturn = true;
         Return ret = new Return(null, value);
         basicBlock.setTerminator(ret);
+    }
+
+    public void setNoSideEffect(boolean sideEffect) {
+        noSideEffect = sideEffect;
+    }
+
+    public boolean isNoSideEffect() {
+        return noSideEffect;
+    }
+
+    public void addChild(Call function) {
+        callers.add(function);
+    }
+
+    public HashSet<Call> getCallers() {
+        return callers;
     }
 
     public void setVirtualName() {

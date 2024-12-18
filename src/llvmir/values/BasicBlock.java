@@ -4,7 +4,6 @@ import llvmir.Value;
 import llvmir.ValueType;
 import llvmir.values.instr.Branch;
 import llvmir.values.instr.Instruction;
-import llvmir.values.instr.Pc;
 import llvmir.values.instr.Phi;
 
 import java.util.ArrayList;
@@ -23,19 +22,21 @@ public class BasicBlock extends Value {
     private HashSet<BasicBlock> dom = new HashSet<>();  // 被支配的基本块集合
     private final HashSet<BasicBlock> domChild = new HashSet<>();
     private HashSet<BasicBlock> DF = new HashSet<>();
-    private BasicBlock directDom;
+    private BasicBlock iDom;
+    private int domDepth = 0;
     private HashSet<Value> uses = new HashSet<>();
     private HashSet<Value> defs = new HashSet<>();
     private HashSet<Value> ins = new HashSet<>();
     private HashSet<Value> outs = new HashSet<>();
     private BasicBlock neighbour;
+    protected int loopDepth = 0;
 
     public BasicBlock(String name, Function function) {
         super(new ValueType.Type(ValueType.DataType.LabelTy), name);
         instructions = new LinkedList<>();
         parent = function;
         dom.add(this);
-        directDom = null;
+        iDom = null;
     }
 
     public void setNeedName(boolean needName) {
@@ -97,12 +98,12 @@ public class BasicBlock extends Value {
             if (!block.equals(this)) {
                 if (block.getDom().size() > maxDom) {
                     maxDom = block.getDom().size();
-                    directDom = block;
+                    iDom = block;
                 }
             }
         }
-        if (directDom != null) {
-            directDom.addDomChild(this);
+        if (iDom != null) {
+            iDom.addDomChild(this);
         }
     }
 
@@ -110,12 +111,20 @@ public class BasicBlock extends Value {
         domChild.add(block);
     }
 
+    public void setDomDepth(int depth) {
+        domDepth = depth;
+    }
+
+    public int getDomDepth() {
+        return domDepth;
+    }
+
     public HashSet<BasicBlock> getDomChild() {
         return domChild;
     }
 
-    public BasicBlock getDirectDom() {
-        return directDom;
+    public BasicBlock getiDom() {
+        return iDom;
     }
 
     public boolean isDomBy(BasicBlock basicBlock) {   // basicBlock 支配 this
@@ -140,6 +149,10 @@ public class BasicBlock extends Value {
 
     public BasicBlock getNeighbour() {
         return neighbour;
+    }
+
+    public int getLoopDepth() {
+        return loopDepth;
     }
 
     public void appendInstr(Instruction instr, boolean setName) {
@@ -174,6 +187,17 @@ public class BasicBlock extends Value {
         }
     }
 
+    public void insertBeforeInstr(Instruction pre, Instruction next) {
+        if (pre == null) {
+            instructions.add(next);
+            next.setParent(this);
+        } else if (instructions.contains(pre)) {
+            int index = instructions.indexOf(pre);
+            instructions.add(index, next);
+            next.setParent(this);
+        }
+    }
+
     public Phi insertPhi(Value value) {
         Phi phi = new Phi(value, "");
         phi.setNeedName(true);
@@ -183,12 +207,12 @@ public class BasicBlock extends Value {
         return phi;
     }
 
-    public void insertBeforeTerminator(Instruction pc) {
-        pc.setParent(this);
+    public void insertBeforeTerminator(Instruction instruction) {
+        instruction.setParent(this);
         if (isTerminator) {
-            instructions.add(instructions.size() - 1, pc);
+            instructions.add(instructions.size() - 1, instruction);
         } else {
-            instructions.add(pc);
+            instructions.add(instruction);
         }
     }
 
@@ -224,6 +248,20 @@ public class BasicBlock extends Value {
 
     public boolean isTerminator() {
         return isTerminator;
+    }
+
+    public void travelLoop(BasicBlock exit, BasicBlock cond, HashSet<BasicBlock> visited) {
+        if (this == exit || this == cond) {
+            return;
+        }
+        if (visited.contains(this)) {
+            return;
+        }
+        visited.add(this);
+        loopDepth++;
+        for (BasicBlock next: getSubsequents()) {
+            next.travelLoop(exit, cond, visited);
+        }
     }
 
     public void setVirtualName() {
@@ -310,6 +348,7 @@ public class BasicBlock extends Value {
 
     public static class ForBlock extends BasicBlock {
         private BasicBlock outBlock;
+        private BasicBlock judgeBlock;
         private BasicBlock updateBlock;
 
         public ForBlock(String name, BasicBlock outBlock, Function function) {
@@ -334,6 +373,22 @@ public class BasicBlock extends Value {
                 return this;
             }
             return updateBlock;
+        }
+
+        public void setJudgeBlock(BasicBlock judgeBlock) {
+            this.judgeBlock = judgeBlock;
+        }
+
+        public void calLoopDepth() {
+            // 先判断循环入口
+            BasicBlock entrance;
+            if (judgeBlock != null) {
+                entrance = judgeBlock;
+            } else {
+                entrance = this;
+            }
+            entrance.loopDepth++;
+            travelLoop(outBlock, entrance, new HashSet<>());
         }
     }
 }

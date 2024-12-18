@@ -47,6 +47,9 @@ public class GVN {
                     hashSet.add(instr);
                 }
             }
+            if (instr instanceof Phi) {
+                instr.setNeedName(true);
+            }
         }
         for (BasicBlock basicBlock: block.getDomChild()) {
             gvnForBlock(basicBlock);

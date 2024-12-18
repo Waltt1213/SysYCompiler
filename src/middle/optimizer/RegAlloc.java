@@ -36,7 +36,7 @@ public class RegAlloc {
             freeRegsPool.clear();
             freeRegsPool.addAll(MipsRegister.allocableRegs());
             instrPos = 0;
-            System.out.println("\n" + function.getFullName() + ":\n");
+            // System.out.println("\n" + function.getFullName() + ":\n");
             for (int i = 0; i < function.getArgc(); i++) {
                 regAllocForValue(function.getFuncFParams().get(i));
             }

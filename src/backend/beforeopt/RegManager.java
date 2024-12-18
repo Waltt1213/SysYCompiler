@@ -1,6 +1,7 @@
 package backend.beforeopt;
 
 import backend.mips.MipsRegister;
+import backend.mips.StackManager;
 
 import java.util.ArrayList;
 import java.util.HashMap;

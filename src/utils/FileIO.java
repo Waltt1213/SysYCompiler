@@ -27,7 +27,7 @@ public class FileIO {
     public static final String NoOptimizeIrFilePath = String.valueOf(Paths.get("testfilei22371103王鹏_优化前中间代码.txt"));
     public static final String OptimizeIrFilePath = String.valueOf(Paths.get("testfilei22371103王鹏_优化后中间代码.txt"));
     public static final String mipsFilePath = String.valueOf(Paths.get("mips.txt"));
-    public static final String NoOptMipsFilePath = String.valueOf(Paths.get("mips_noopt.txt"));
+    public static final String NoOptMipsFilePath = String.valueOf(Paths.get("testfilei22371103王鹏_优化前目标代码.txt"));
 
     public static String readTestFile() throws IOException {
         FileReader fr = new FileReader(testFilePath);

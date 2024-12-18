@@ -207,7 +207,7 @@ public class Visitor {
                 ArrayList<Integer> str2int = Transform.str2intList(s);
                 Value prePtr = alloca;
                 for (int i = 0; i < alloca.getDim() && !str2int.isEmpty(); i++) {
-                    GetElementPtr getElementPtr = new GetElementPtr(prePtr.getTp(), "");
+                    GetElementPtr getElementPtr = new GetElementPtr(prePtr.getTp(), "1");
                     getElementPtr.addOperands(prePtr);
                     if (i == 0) {
                         getElementPtr.addOperands(new Constant("0"));
@@ -234,7 +234,7 @@ public class Visitor {
                     prePtr = getElementPtr;
                 }
             } else if (alloca.isArray()) {
-                GetElementPtr getElementPtr = new GetElementPtr(alloca.getTp(), "");
+                GetElementPtr getElementPtr = new GetElementPtr(alloca.getTp(), "2");
                 getElementPtr.addOperands(alloca);
                 getElementPtr.addOperands(new Constant("0"));
                 getElementPtr.addOperands(new Constant("0"));
@@ -276,7 +276,7 @@ public class Visitor {
         } else { // 数组
             Value prePtr = alloca;
             for (int i = 0;  i < alloca.getDim(); i++) {
-                GetElementPtr getElementPtr = new GetElementPtr(prePtr.getTp(),"");
+                GetElementPtr getElementPtr = new GetElementPtr(prePtr.getTp(),"3");
                 getElementPtr.addOperands(prePtr);
                 if (i == 0) {
                     getElementPtr.addOperands(new Constant("0"));
@@ -298,6 +298,8 @@ public class Visitor {
                 } else if (isConst) {
                     curBasicBlock.appendInstr(getElementPtr, true);
                     res = buildInit(getElementPtr, new Constant(new ValueType.Type(alloca.getDataType()), "0"));
+                } else {    // TODO: 删除无关的getelementptr
+                    getElementPtr.removeOperands(prePtr);
                 }
                 if (isConst) {
                     alloca.setConst(true);
@@ -508,6 +510,7 @@ public class Visitor {
         if (getint == null) {
             getint = new Function(new ValueType.Type(Integer32Ty), "getint", false);
             getint.setNotVoid(true);
+            getint.setNoSideEffect(false);
             module.addDeclare(getint);
         }
         Call call = new Call("", getint);
@@ -524,6 +527,7 @@ public class Visitor {
         if (getchar == null) {
             getchar = new Function(new ValueType.Type(Integer32Ty), "getchar", false);
             getchar.setNotVoid(true);
+            getchar.setNoSideEffect(false);
             module.addDeclare(getchar);
         }
         Call call = new Call("", getchar);
@@ -624,6 +628,7 @@ public class Visitor {
             if (updateBlock == null) {
                 condBlock.setUpdateBlock(judgeBlock);
             }
+            condBlock.setJudgeBlock(judgeBlock);
         } else {
             judge.addOperands(condBlock);
             curBasicBlock.setTerminator(judge);
@@ -753,6 +758,7 @@ public class Visitor {
             if (putstr == null) {
                 putstr = new Function(new ValueType.Type(VoidTy),"putstr", false);
                 module.addDeclare(putstr);
+                putstr.setNoSideEffect(false);
                 putstr.addParams(new Argument(new ValueType.PointerType(Integer8Ty), "param"), false);
             }
             Call call = new Call(putstr);
@@ -767,6 +773,7 @@ public class Visitor {
             if (putch == null) {
                 putch = new Function(new ValueType.Type(VoidTy), "putch", false);
                 module.addDeclare(putch);
+                putch.setNoSideEffect(false);
                 putch.addParams(new Argument(new ValueType.Type(Integer32Ty), "param"), false);
             }
             Call call = new Call(putch);
@@ -778,6 +785,7 @@ public class Visitor {
             if (putint == null) {
                 putint = new Function(new ValueType.Type(VoidTy), "putint", false);
                 module.addDeclare(putint);
+                putint.setNoSideEffect(false);
                 putint.addParams(new Argument(new ValueType.Type(Integer32Ty), "param"), false);
             }
             Call call = new Call(putint);
@@ -1201,7 +1209,7 @@ public class Visitor {
         // 全局和局部数组，需要传递数组的指针
         if (!lVal.isArrayElement() && value.getTp() instanceof ValueType.PointerType
                 && value.getTp().getInnerType() instanceof ValueType.ArrayType) {
-            GetElementPtr getElementPtr = new GetElementPtr(value.getTp(), "");
+            GetElementPtr getElementPtr = new GetElementPtr(value.getTp(), "4");
             getElementPtr.addOperands(value);
             getElementPtr.addOperands(new Constant("0"));
             getElementPtr.addOperands(new Constant("0"));
@@ -1234,7 +1242,7 @@ public class Visitor {
             curBasicBlock.appendInstr(load, true);
             operand = load;
         }
-        GetElementPtr getElementPtr = new GetElementPtr(operand.getTp(), "");
+        GetElementPtr getElementPtr = new GetElementPtr(operand.getTp(), "5");
         getElementPtr.addOperands(operand);
         if (operand.getTp().getInnerType() instanceof ValueType.ArrayType) {
             // 如果是数组指针则需要索引添加0

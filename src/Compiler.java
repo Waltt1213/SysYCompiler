@@ -59,9 +59,9 @@ public class Compiler {
             MipsModule mipsModule = translator.getMipsModule();
             FileIO.printMipsCode(mipsModule);
         } else {
-            OldTranslator oldTranslator = new OldTranslator(module);
-            oldTranslator.genMipsCode();
-            FileIO.printMipsCode(oldTranslator.getDataSegment(), oldTranslator.getTextSegment());
+            OldTranslator translator = new OldTranslator(module);
+            translator.genMipsCode();
+            FileIO.printMipsCode(translator.getDataSegment(), translator.getTextSegment());
         }
     }
 }

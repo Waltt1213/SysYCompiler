@@ -4,7 +4,6 @@ import llvmir.Module;
 import llvmir.values.BasicBlock;
 import llvmir.values.Function;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 
 public class CFG {
@@ -17,6 +16,7 @@ public class CFG {
     public void buildCFG() {
         buildDom();         // 计算支配关系
         calDF();            // 计算支配边界
+        calDomDepth();      // 计算支配深度
     }
 
     private void buildDom() {
@@ -66,21 +66,35 @@ public class CFG {
     private void calFuncDF(Function function) {
         // 计算直接支配
         for (BasicBlock block: function.getBasicBlocks()) {
+            block.setDF(new HashSet<>());
             block.calDirectDom();
         }
         for (BasicBlock b: function.getBasicBlocks()) {
             for (BasicBlock p: b.getPrecursor()) {
                 BasicBlock a = p;
                 while (!b.isStrictDomBy(a)) {
-                    if (a.getDirectDom() != null) {
+                    if (a.getiDom() != null) {
                         HashSet<BasicBlock> DF = a.getDF();
                         DF.add(b);
-                        a = a.getDirectDom();
+                        a = a.getiDom();
                     } else {
                         break;
                     }
                 }
             }
+        }
+    }
+
+    private void calDomDepth() {
+        for (Function function: module.getFunctions()) {
+            calDomDepthForFunc(function.getBasicBlocks().get(0), 0);
+        }
+    }
+
+    private void calDomDepthForFunc(BasicBlock first, int depth) {
+        first.setDomDepth(depth);
+        for (BasicBlock next: first.getDomChild()) {
+            calDomDepthForFunc(next, depth + 1);
         }
     }
 }
