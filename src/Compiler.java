@@ -11,7 +11,7 @@ import utils.FileIO;
 import java.io.IOException;
 
 public class Compiler {
-    private static final boolean Optimize = true;
+    private static final boolean Optimize = false;
 
     public static void main(String[] args) throws IOException {
         // Step 1: read source code from test file

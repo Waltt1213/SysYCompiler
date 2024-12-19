@@ -9,6 +9,7 @@ import llvmir.ValueType;
 import llvmir.values.*;
 import llvmir.values.instr.*;
 
+import java.math.BigInteger;
 import java.util.*;
 
 import static backend.mips.MipsInstrType.*;
@@ -493,9 +494,15 @@ public class Translator {
         MipsRegister op1 = getReg(operand1);
         MipsRegister op2 = getReg(operand2);
         if (operand1 instanceof Constant && !operand1.getName().equals("0")) {
+            if (op == Instruction.Type.MUL && mulOptimize(binaryOperator, (Constant) operand1, op2)) {
+                return;
+            }
             currentFunction.addInstr(new MipsInstruction(ADDIU, op1.getName(), "$zero", operand1.getName()));
         }
         if (operand2 instanceof Constant && !operand2.getName().equals("0")) {
+            if (op == Instruction.Type.MUL && mulOptimize(binaryOperator, (Constant) operand2, op1)) {
+                return;
+            }
             currentFunction.addInstr(new MipsInstruction(ADDIU, op2.getName(), "$zero", operand2.getName()));
         }
         MipsInstrType type = op == Instruction.Type.MUL ? MULT : DIV;
@@ -507,6 +514,69 @@ public class Translator {
             currentFunction.addInstr(new MipsInstruction(MFHI, temp.getName()));
         }
         saveInStack(binaryOperator, temp);
+    }
+
+    private boolean mulOptimize(BinaryOperator mul, Constant constant, MipsRegister operand) {
+        int exp = 0;
+        if (constant.getName().equals("0")) {
+            MipsRegister temp = getReg(mul);
+            currentFunction.addInstr(new MipsInstruction(MOVE, temp.getName(), "$zero"));
+            return true;
+        } else if (constant.getName().equals("1")) {
+            MipsRegister temp = getReg(mul);
+            currentFunction.addInstr(new MipsInstruction(MOVE, temp.getName(), operand.getName()));
+            return true;
+        } else if ((exp = checkPowerOfTwo(constant.getName())) >= 0) {
+            MipsRegister temp = getReg(mul);
+            currentFunction.addInstr(new MipsInstruction(SLL, temp.getName(), operand.getName(), String.valueOf(exp)));
+            return true;
+        } else {
+            BigInteger c = new BigInteger(constant.getName());
+            BigInteger sub = c.subtract(BigInteger.ONE);
+            BigInteger add = c.add(BigInteger.ONE);
+            if ((exp = checkPowerOfTwo(sub.toString())) >= 0) { // constant = 2^n + 1
+                // x * constant = x * 2^n + x = x << n + x
+                MipsRegister temp = getReg(mul);
+                if (temp.equals(operand)) {
+                    return false;
+                }
+                currentFunction.addInstr(new MipsInstruction(SLL, temp.getName(), operand.getName(), String.valueOf(exp)));
+                currentFunction.addInstr(new MipsInstruction(ADDU, temp.getName(), temp.getName(), operand.getName()));
+                return true;
+            } else if ((exp = checkPowerOfTwo(add.toString())) >= 0) {  // constant = 2^n - 1
+                MipsRegister temp = getReg(mul);
+                if (temp.equals(operand)) {
+                    return false;
+                }
+                currentFunction.addInstr(new MipsInstruction(SLL, temp.getName(), operand.getName(), String.valueOf(exp)));
+                currentFunction.addInstr(new MipsInstruction(SUBU, temp.getName(), temp.getName(), operand.getName()));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int checkPowerOfTwo(String numStr) {
+        // 将输入的字符串转换为BigInteger
+        BigInteger num = new BigInteger(numStr);
+
+        // 负数或者0不是2的正整数次幂
+        if (num.compareTo(BigInteger.ZERO) <= 0) {
+            return -1;
+        }
+
+        // 检查是否为2的某次幂
+        int exponent = 0;
+        while (num.compareTo(BigInteger.ONE) > 0) {
+            // 如果当前数字不是2的幂次，返回-1
+            if (num.mod(BigInteger.valueOf(2)).compareTo(BigInteger.ZERO) != 0) {
+                return -1;
+            }
+            num = num.divide(BigInteger.valueOf(2));
+            exponent++;
+        }
+
+        return exponent;
     }
 
     public void genTrunc(Trunc trunc) {
