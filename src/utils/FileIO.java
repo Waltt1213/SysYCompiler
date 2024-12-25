@@ -86,9 +86,13 @@ public class FileIO {
             return;
         }
         errors.sort(Comparator.comparing(Error::getLineno));
+        int lastLineno = 0;
         for (Error error: errors) {
             String line = error.toString() + "\n";
-            bw.write(line);
+            if (lastLineno != error.getLineno()) {
+                bw.write(line);
+                lastLineno = error.getLineno();
+            }
         }
         bw.close();
         fw.close();

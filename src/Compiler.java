@@ -33,6 +33,9 @@ public class Compiler {
         visitor.buildIR();
         FileIO.printSymTableResult(visitor.getSymbolTables());
         FileIO.printError(visitor.getErrors());
+        if (!visitor.getErrors().isEmpty()) {
+            return;
+        }
 
         // Step 5: Mid optimize
         Module module = visitor.getModule();
