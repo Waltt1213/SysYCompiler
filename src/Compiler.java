@@ -11,7 +11,7 @@ import utils.FileIO;
 import java.io.IOException;
 
 public class Compiler {
-    private static final boolean Optimize = false;
+    private static final boolean Optimize = true;   // whether optimize
 
     public static void main(String[] args) throws IOException {
         // Step 1: read source code from test file
@@ -41,6 +41,7 @@ public class Compiler {
         Module module = visitor.getModule();
         Optimizer optimizer = new Optimizer(module);
         if (Optimize) {
+            // Save the IR code before optimizing
             module.setVirtualName();
             FileIO.printLlvmIrResult(module, FileIO.NoOptimizeIrFilePath);
             optimizer.optimizeSSA();
